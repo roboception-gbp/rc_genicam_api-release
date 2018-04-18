@@ -1,3 +1,24 @@
+1.3.8 (2018-04-18)
+------------------
+
+- show actually searched path instead of env var in exception if no transport layer found
+- improved README
+
+1.3.7 (2018-04-09)
+------------------
+
+- Devices can now be discovered by serial number as well
+
+1.3.6 (2018-02-25)
+------------------
+
+- fix path to genicam arm64 libs
+
+1.3.5 (2018-02-25)
+------------------
+
+- add libs for arm64
+
 1.3.4 (2018-02-23)
 ------------------
 
