@@ -1,3 +1,20 @@
+1.3.10 (2018-06-28)
+------------------
+
+- Added possibility to set GenICam parameters in gc_info too
+- Only show network summary in gc_config if called without parameters or with network related parameters
+- Corrected spelling of visard in gc_pointcloud output file name
+
+1.3.9 (2018-06-15)
+------------------
+
+- Bash completion for UNIX and ROS
+- Relaxed synchronization in gc_pointcloud for special exposure alternate mode of rc_visard
+- Added method in image list class to request the oldest timestamp
+- Added triangulation to gc_pointcloud
+- Added parameter for output file name to gc_pointcloud
+- Fixed crashing of gc_info if enumeration does not have a value
+
 1.3.8 (2018-04-18)
 ------------------
 
