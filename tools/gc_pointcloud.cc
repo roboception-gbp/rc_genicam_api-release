@@ -53,9 +53,55 @@ namespace
 {
 
 /*
+  Print help text on standard output.
+*/
+
+void printHelp(const char *prgname)
+{
+  // show help
+
+  std::cout << prgname << " [-o <output-filename>] [<interface-id>:]<device-id>" << std::endl;
+  std::cout << std::endl;
+  std::cout << "Gets the first synchronized image set consisting of left, disparity, confidence" << std::endl;
+  std::cout << "and error image, creates a point cloud and stores it in ply ascii format" << std::endl;
+  std::cout << "in the current directory." << std::endl;
+  std::cout << std::endl;
+  std::cout << "<device-id> Device from which images will taken" << std::endl;
+}
+
+/*
+  Get the i-th 16 bit value.
+
+  @param p         Pointer to first byte of array of 16 bit values.
+  @param bigendian True if values are given as big endian. Otherwise, litte
+                   endian is assumed.
+  @param i         Index of 16 bit inside the given array.
+*/
+
+inline uint16_t getUint16(const uint8_t *p, bool bigendian, int i)
+{
+  uint16_t ret;
+
+  if (bigendian)
+  {
+    size_t j=i<<1;
+    ret=((p[j]<<8)|p[j+1]);
+  }
+  else
+  {
+    size_t j=i<<1;
+    ret=((p[j+1]<<8)|p[j]);
+  }
+
+  return ret;
+}
+
+/*
   Computes a point cloud from the given synchronized left and disparity image
   pair and stores it in ply ascii format.
 
+  @param name  Name of output file. If empty, a standard file name with
+               timestamp is used.
   @param f     Focal length factor (to be multiplicated with image width).
   @param t     Baseline in m.
   @param scale Disparity scale factor.
@@ -69,7 +115,7 @@ namespace
                image must be in format Error8.
 */
 
-void storePointCloud(double f, double t, double scale,
+void storePointCloud(std::string name, double f, double t, double scale,
                      std::shared_ptr<const rcg::Image> left,
                      std::shared_ptr<const rcg::Image> disp,
                      std::shared_ptr<const rcg::Image> conf=0,
@@ -91,7 +137,12 @@ void storePointCloud(double f, double t, double scale,
   const uint8_t *dps=disp->getPixels();
   size_t dstep=disp->getWidth()*sizeof(uint16_t)+disp->getXPadding();
 
-  // count number of valid disparities
+  // count number of valid disparities and store vertice index in a temporary
+  // index image
+
+  int vi=0;
+  const uint32_t vinvalid=0xffffffff;
+  std::vector<uint32_t> vindex(width*height);
 
   int n=0;
   for (size_t k=0; k<height; k++)
@@ -99,8 +150,51 @@ void storePointCloud(double f, double t, double scale,
     int j=0;
     for (size_t i=0; i<width; i++)
     {
-      if ((dps[j]|dps[j+1]) != 0) n++;
+      vindex[vi]=vinvalid;
+      if ((dps[j]|dps[j+1]) != 0) vindex[vi]=n++;
+
       j+=2;
+      vi++;
+    }
+
+    dps+=dstep;
+  }
+
+  dps=disp->getPixels();
+
+  // count number of triangles
+
+  const uint16_t vstep=static_cast<uint16_t>(std::ceil(2/scale));
+
+  int tn=0;
+  for (size_t k=1; k<height; k++)
+  {
+    for (size_t i=1; i<width; i++)
+    {
+      uint16_t v[4];
+      v[0]=getUint16(dps, bigendian, i-1);
+      v[1]=getUint16(dps, bigendian, i);
+      v[2]=getUint16(dps+dstep, bigendian, i-1);
+      v[3]=getUint16(dps+dstep, bigendian, i);
+
+      uint16_t vmin=65535;
+      uint16_t vmax=0;
+      int valid=0;
+
+      for (int jj=0; jj<4; jj++)
+      {
+        if (v[jj])
+        {
+          vmin=std::min(vmin, v[jj]);
+          vmax=std::max(vmax, v[jj]);
+          valid++;
+        }
+      }
+
+      if (valid >= 3 && vmax-vmin <= vstep)
+      {
+        tn+=valid-2;
+      }
     }
 
     dps+=dstep;
@@ -127,11 +221,15 @@ void storePointCloud(double f, double t, double scale,
 
   // open output file and write ASCII PLY header
 
-  std::ostringstream name;
-  double timestamp=left->getTimestampNS()/1000000000.0;
-  name << "rc_vizard_" << std::setprecision(16) << timestamp << ".ply";
+  if (name.size() == 0)
+  {
+    std::ostringstream os;
+    double timestamp=left->getTimestampNS()/1000000000.0;
+    os << "rc_visard_" << std::setprecision(16) << timestamp << ".ply";
+    name=os.str();
+  }
 
-  std::ofstream out(name.str());
+  std::ofstream out(name);
 
   out << "ply" << std::endl;
   out << "format ascii 1.0" << std::endl;
@@ -156,9 +254,11 @@ void storePointCloud(double f, double t, double scale,
   out << "property uint8 diffuse_red" << std::endl;
   out << "property uint8 diffuse_green" << std::endl;
   out << "property uint8 diffuse_blue" << std::endl;
+  out << "element face " << tn << std::endl;
+  out << "property list uint8 uint32 vertex_indices" << std::endl;
   out << "end_header" << std::endl;
 
-  // create point cloud
+  // create colored point cloud
 
   for (size_t k=0; k<height; k++)
   {
@@ -166,21 +266,11 @@ void storePointCloud(double f, double t, double scale,
     {
       // convert disparity from fixed comma 16 bit integer into float value
 
-      double d;
-      if (bigendian)
-      {
-        size_t j=i<<1;
-        d=scale*((dps[j]<<8)|dps[j+1]);
-      }
-      else
-      {
-        size_t j=i<<1;
-        d=scale*((dps[j+1]<<8)|dps[j]);
-      }
+      double d=scale*getUint16(dps, bigendian, i);
 
       // if disparity is valid and color can be obtained
 
-      if (d > 0)
+      if (d)
       {
         // reconstruct 3D point from disparity value
 
@@ -224,6 +314,73 @@ void storePointCloud(double f, double t, double scale,
     eps+=estep;
   }
 
+  dps=disp->getPixels();
+
+  // create triangles
+
+  uint32_t *ips=vindex.data();
+  for (size_t k=1; k<height; k++)
+  {
+    for (size_t i=1; i<width; i++)
+    {
+      uint16_t v[4];
+      v[0]=getUint16(dps, bigendian, i-1);
+      v[1]=getUint16(dps, bigendian, i);
+      v[2]=getUint16(dps+dstep, bigendian, i-1);
+      v[3]=getUint16(dps+dstep, bigendian, i);
+
+      uint16_t vmin=65535;
+      uint16_t vmax=0;
+      int valid=0;
+
+      for (int jj=0; jj<4; jj++)
+      {
+        if (v[jj])
+        {
+          vmin=std::min(vmin, v[jj]);
+          vmax=std::max(vmax, v[jj]);
+          valid++;
+        }
+      }
+
+      if (valid >= 3 && vmax-vmin <= vstep)
+      {
+        int j=0;
+        uint32_t f[4];
+
+        if (ips[i-1] != vinvalid)
+        {
+          f[j++]=ips[i-1];
+        }
+
+        if (ips[width+i-1] != vinvalid)
+        {
+          f[j++]=ips[width+i-1];
+        }
+
+        if (ips[width+i] != vinvalid)
+        {
+          f[j++]=ips[width+i];
+        }
+
+        if (ips[i] != vinvalid)
+        {
+          f[j++]=ips[i];
+        }
+
+        out << "3 " << f[0] << ' ' << f[1] << ' ' << f[2] << std::endl;
+
+        if (j == 4)
+        {
+          out << "3 " << f[2] << ' ' << f[3] << ' ' << f[0] << std::endl;
+        }
+      }
+    }
+
+    ips+=width;
+    dps+=dstep;
+  }
+
   out.close();
 }
 
@@ -233,182 +390,242 @@ int main(int argc, char *argv[])
 {
   try
   {
-    if (argc >= 2)
+    // optional parameters
+
+    std::string name="";
+
+    int i=1;
+
+    while (i+1 < argc)
     {
-      // find specific device accross all systems and interfaces and open it
-
-      std::shared_ptr<rcg::Device> dev=rcg::getDevice(argv[1]);
-
-      if (dev)
+      if (std::string(argv[i]) == "-o")
       {
-        dev->open(rcg::Device::CONTROL);
-        std::shared_ptr<GenApi::CNodeMapRef> nodemap=dev->getRemoteNodeMap();
-
-        // get focal length, baseline and disparity scale factor
-
-        double f=rcg::getFloat(nodemap, "FocalLengthFactor", 0, 0, false);
-        double t=rcg::getFloat(nodemap, "Baseline", 0, 0, true);
-        double scale=rcg::getFloat(nodemap, "Scan3dCoordinateScale", 0, 0, true);
-
-        // sanity check of some parameters
-
-        rcg::checkFeature(nodemap, "Scan3dOutputMode", "DisparityC");
-        rcg::checkFeature(nodemap, "Scan3dCoordinateOffset", "0");
-        rcg::checkFeature(nodemap, "Scan3dInvalidDataFlag", "1");
-        rcg::checkFeature(nodemap, "Scan3dInvalidDataValue", "0");
-
-        // set to color format if available
-
-        rcg::setEnum(nodemap, "PixelFormat", "YCbCr411_8", false);
-
-        // enable left image and disparity image and disable all other streams
-
-        {
-          std::vector<std::string> component;
-
-          rcg::getEnum(nodemap, "ComponentSelector", component, true);
-
-          for (size_t i=0; i<component.size(); i++)
-          {
-            rcg::setEnum(nodemap, "ComponentSelector", component[i].c_str(), true);
-
-            bool enable=(component[i] == "Intensity" || component[i] == "Disparity" ||
-                         component[i] == "Confidence" || component[i] == "Error");
-            rcg::setBoolean(nodemap, "ComponentEnable", enable, true);
-          }
-        }
-
-        // open image stream
-
-        std::vector<std::shared_ptr<rcg::Stream> > stream=dev->getStreams();
-
-        if (stream.size() > 0)
-        {
-          // opening first stream
-
-          stream[0]->open();
-          stream[0]->startStreaming();
-
-          // prepare buffers for time synchronization of images (buffer at most
-          // 25 images in each list)
-
-          rcg::ImageList left_list(50);
-          rcg::ImageList disp_list(25);
-          rcg::ImageList conf_list(25);
-          rcg::ImageList error_list(25);
-
-          bool run=true;
-          int async=0, maxasync=50; // maximum number of asynchroneous images before giving up
-
-          while (run && async < maxasync)
-          {
-            async++;
-
-            // grab next image with timeout of 0.5 seconds
-
-            const rcg::Buffer *buffer=stream[0]->grab(500);
-            if (buffer != 0)
-            {
-              // check for a complete image in the buffer
-
-              if (!buffer->getIsIncomplete() && buffer->getImagePresent())
-              {
-                // store image in the corresponding list
-
-                uint64_t pixelformat=buffer->getPixelFormat();
-                if (pixelformat == Mono8 || pixelformat == YCbCr411_8)
-                {
-                  left_list.add(buffer);
-                }
-                else if (pixelformat == Coord3D_C16)
-                {
-                  disp_list.add(buffer);
-                }
-                else if (pixelformat == Confidence8)
-                {
-                  conf_list.add(buffer);
-                }
-                else if (pixelformat == Error8)
-                {
-                  error_list.add(buffer);
-                }
-
-                // check if both lists contain an image with the current time
-                // stamp
-
-                uint64_t timestamp=buffer->getTimestampNS();
-
-                std::shared_ptr<const rcg::Image> left=left_list.find(timestamp);
-                std::shared_ptr<const rcg::Image> disp=disp_list.find(timestamp);
-                std::shared_ptr<const rcg::Image> conf=conf_list.find(timestamp);
-                std::shared_ptr<const rcg::Image> error=error_list.find(timestamp);
-
-                if (left && disp && conf && error)
-                {
-                  // compute and store point cloud from synchronized image pair
-
-                  storePointCloud(f, t, scale, left, disp, conf, error);
-
-                  // remove all images from the buffer with the current or an
-                  // older time stamp
-
-                  async=0;
-                  left_list.removeOld(timestamp);
-                  disp_list.removeOld(timestamp);
-                  conf_list.removeOld(timestamp);
-                  error_list.removeOld(timestamp);
-
-                  // in this example, we exit the grabbing loop after receiving
-                  // the first synchronized image pair
-
-                  run=false;
-                }
-              }
-            }
-            else
-            {
-              std::cerr << "Cannot grab images" << std::endl;
-              break;
-            }
-          }
-
-          // report if synchronization failed
-
-          if (async >= maxasync && run)
-          {
-            std::cerr << "Cannot grab synchronized left and disparity image" << std::endl;
-          }
-
-          // stopping and closing image stream
-
-          stream[0]->stopStreaming();
-          stream[0]->close();
-        }
-        else
-        {
-          std::cerr << "No streams available" << std::endl;
-        }
-
-        // closing the communication to the device
-
-        dev->close();
+        i++;
+        name=argv[i++];
       }
       else
       {
-        std::cerr << "Device '" << argv[1] << "' not found!" << std::endl;
+        std::cout << "Unknown parameter: " << argv[i] << std::endl;
+        std::cout << std::endl;
+
+        printHelp(argv[0]);
+
+        return 1;
       }
+    }
+
+    if (i >= argc)
+    {
+      printHelp(argv[0]);
+      return 1;
+    }
+
+    // find specific device accross all systems and interfaces and open it
+
+    std::shared_ptr<rcg::Device> dev=rcg::getDevice(argv[i]);
+
+    if (dev)
+    {
+      dev->open(rcg::Device::CONTROL);
+      std::shared_ptr<GenApi::CNodeMapRef> nodemap=dev->getRemoteNodeMap();
+
+      // get focal length, baseline and disparity scale factor
+
+      double f=rcg::getFloat(nodemap, "FocalLengthFactor", 0, 0, false);
+      double t=rcg::getFloat(nodemap, "Baseline", 0, 0, true);
+      double scale=rcg::getFloat(nodemap, "Scan3dCoordinateScale", 0, 0, true);
+
+      // check for special exposure alternate mode of rc_visard and
+      // corresponding filter and set tolerance accordingly
+
+      // (The exposure alternate mode is typically used with a random dot
+      // projector connected to Out1. Alternate means that Out1 is high for
+      // every second image. The rc_visard calculates disparities from images
+      // with Out1=High. However, if the alternate filter is set to OnlyLow,
+      // then it is gueranteed that Out1=Low (i.e. projector off) for all
+      // rectified images. Thus, rectified images and disparity images are
+      // always around 40 ms appart, which must be taken into account for
+      // synchronization.)
+
+      uint64_t tol=0;
+
+      try
+      {
+        rcg::setEnum(nodemap, "LineSelector", "Out1", true);
+        std::string linesource=rcg::getEnum(nodemap, "LineSource", true);
+        std::string filter=rcg::getEnum(nodemap, "AcquisitionAlternateFilter", true);
+
+        if (linesource == "ExposureAlternateActive" && filter == "OnlyLow")
+        {
+          tol=50*1000*1000; // set tolerance to 50 ms
+        }
+      }
+      catch (const std::exception &)
+      {
+        // ignore possible errors
+      }
+
+      // sanity check of some parameters
+
+      rcg::checkFeature(nodemap, "Scan3dOutputMode", "DisparityC");
+      rcg::checkFeature(nodemap, "Scan3dCoordinateOffset", "0");
+      rcg::checkFeature(nodemap, "Scan3dInvalidDataFlag", "1");
+      rcg::checkFeature(nodemap, "Scan3dInvalidDataValue", "0");
+
+      // set to color format if available
+
+      rcg::setEnum(nodemap, "PixelFormat", "YCbCr411_8", false);
+
+      // enable left image and disparity image and disable all other streams
+
+      {
+        std::vector<std::string> component;
+
+        rcg::getEnum(nodemap, "ComponentSelector", component, true);
+
+        for (size_t i=0; i<component.size(); i++)
+        {
+          rcg::setEnum(nodemap, "ComponentSelector", component[i].c_str(), true);
+
+          bool enable=(component[i] == "Intensity" || component[i] == "Disparity" ||
+                       component[i] == "Confidence" || component[i] == "Error");
+          rcg::setBoolean(nodemap, "ComponentEnable", enable, true);
+        }
+      }
+
+      // open image stream
+
+      std::vector<std::shared_ptr<rcg::Stream> > stream=dev->getStreams();
+
+      if (stream.size() > 0)
+      {
+        // opening first stream
+
+        stream[0]->open();
+        stream[0]->startStreaming();
+
+        // prepare buffers for time synchronization of images (buffer at most
+        // 25 images in each list)
+
+        rcg::ImageList left_list(50);
+        rcg::ImageList disp_list(25);
+        rcg::ImageList conf_list(25);
+        rcg::ImageList error_list(25);
+
+        bool run=true;
+        int async=0, maxasync=50; // maximum number of asynchroneous images before giving up
+
+        while (run && async < maxasync)
+        {
+          async++;
+
+          // grab next image with timeout of 0.5 seconds
+
+          const rcg::Buffer *buffer=stream[0]->grab(500);
+          if (buffer != 0)
+          {
+            // check for a complete image in the buffer
+
+            if (!buffer->getIsIncomplete() && buffer->getImagePresent())
+            {
+              // store image in the corresponding list
+
+              uint64_t left_tol=0;
+              uint64_t disp_tol=0;
+
+              uint64_t pixelformat=buffer->getPixelFormat();
+              if (pixelformat == Mono8 || pixelformat == YCbCr411_8)
+              {
+                left_list.add(buffer);
+                disp_tol=tol;
+              }
+              else if (pixelformat == Coord3D_C16)
+              {
+                disp_list.add(buffer);
+                left_tol=tol;
+              }
+              else if (pixelformat == Confidence8)
+              {
+                conf_list.add(buffer);
+                left_tol=tol;
+              }
+              else if (pixelformat == Error8)
+              {
+                error_list.add(buffer);
+                left_tol=tol;
+              }
+
+              // get corresponding left and disparity images
+
+              uint64_t timestamp=buffer->getTimestampNS();
+              std::shared_ptr<const rcg::Image> left=left_list.find(timestamp, left_tol);
+              std::shared_ptr<const rcg::Image> disp=disp_list.find(timestamp, disp_tol);
+
+              // get confidence and error images that correspond to the
+              // disparity image
+
+              std::shared_ptr<const rcg::Image> conf;
+              std::shared_ptr<const rcg::Image> error;
+
+              if (disp)
+              {
+                conf=conf_list.find(disp->getTimestampNS());
+                error=error_list.find(disp->getTimestampNS());
+              }
+
+              if (left && disp && conf && error)
+              {
+                // compute and store point cloud from synchronized image pair
+
+                storePointCloud(name, f, t, scale, left, disp, conf, error);
+
+                // remove all images from the buffer with the current or an
+                // older time stamp
+
+                async=0;
+                left_list.removeOld(timestamp);
+                disp_list.removeOld(timestamp);
+                conf_list.removeOld(timestamp);
+                error_list.removeOld(timestamp);
+
+                // in this example, we exit the grabbing loop after receiving
+                // the first synchronized image pair
+
+                run=false;
+              }
+            }
+          }
+          else
+          {
+            std::cerr << "Cannot grab images" << std::endl;
+            break;
+          }
+        }
+
+        // report if synchronization failed
+
+        if (async >= maxasync && run)
+        {
+          std::cerr << "Cannot grab synchronized left and disparity image" << std::endl;
+        }
+
+        // stopping and closing image stream
+
+        stream[0]->stopStreaming();
+        stream[0]->close();
+      }
+      else
+      {
+        std::cerr << "No streams available" << std::endl;
+      }
+
+      // closing the communication to the device
+
+      dev->close();
     }
     else
     {
-      // show help
-
-      std::cout << argv[0] << " [interface-id>:]<device-id>" << std::endl;
-      std::cout << std::endl;
-      std::cout << "Gets the first synchronized image set consisting of left, disparity, confidence" << std::endl;
-      std::cout << "and error image, creates a point cloud and stores it in ply ascii format" << std::endl;
-      std::cout << "in the current directory." << std::endl;
-      std::cout << std::endl;
-      std::cout << "<device-id> Device from which images will taken" << std::endl;
+      std::cerr << "Device '" << argv[1] << "' not found!" << std::endl;
     }
   }
   catch (const std::exception &ex)

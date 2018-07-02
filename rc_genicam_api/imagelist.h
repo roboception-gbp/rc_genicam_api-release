@@ -92,6 +92,14 @@ class ImageList
     void removeOld(uint64_t timestamp);
 
     /**
+      Get oldest timestamp of the list.
+
+      @return Oldest timestamp available or 0 if list is empty.
+    */
+
+    uint64_t getOldestTime();
+
+    /**
       Returns the image that has the given timestamp. If the image cannot be
       found, then a nullptr is returned.
 
@@ -100,6 +108,19 @@ class ImageList
     */
 
     std::shared_ptr<const Image> find(uint64_t timestamp);
+
+    /**
+      Returns the oldest image that has a timestamp within the tolerance of the
+      given timestamp. If the tolerance is <= 0, then the behaviour is the same
+      as for find(timestamp). If the image cannot be found, then a nullptr is
+      returned.
+
+      @param timestamp Timestamp.
+      @param tolerance Maximum tolarance added or subtracted to the timestamp.
+      @return Pointer to image or 0.
+    */
+
+    std::shared_ptr<const Image> find(uint64_t timestamp, uint64_t tolerance);
 
   private:
 
