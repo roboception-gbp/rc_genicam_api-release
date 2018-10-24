@@ -78,9 +78,10 @@ class ImageList
       be dropped.
 
       @param buffer Buffer from which an image will be created.
+      @param part   Part number from which the image should be created.
     */
 
-    void add(const Buffer *buffer);
+    void add(const Buffer *buffer, uint32_t part);
 
     /**
       Removes all images that have a timestamp that is older or equal than the
@@ -97,7 +98,7 @@ class ImageList
       @return Oldest timestamp available or 0 if list is empty.
     */
 
-    uint64_t getOldestTime();
+    uint64_t getOldestTime() const;
 
     /**
       Returns the image that has the given timestamp. If the image cannot be
@@ -107,7 +108,7 @@ class ImageList
       @return Pointer to image or 0.
     */
 
-    std::shared_ptr<const Image> find(uint64_t timestamp);
+    std::shared_ptr<const Image> find(uint64_t timestamp) const;
 
     /**
       Returns the oldest image that has a timestamp within the tolerance of the
@@ -120,7 +121,8 @@ class ImageList
       @return Pointer to image or 0.
     */
 
-    std::shared_ptr<const Image> find(uint64_t timestamp, uint64_t tolerance);
+    std::shared_ptr<const Image> find(uint64_t timestamp,
+                                      uint64_t tolerance) const;
 
   private:
 
