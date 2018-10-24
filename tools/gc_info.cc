@@ -312,7 +312,9 @@ int main(int argc, char *argv[])
           std::cout << "Model:          " << system[i]->getModel() << std::endl;
           std::cout << "Vendor version: " << system[i]->getVersion() << std::endl;
           std::cout << "TL type:        " << system[i]->getTLType() << std::endl;
+          std::cout << "Name:           " << system[i]->getName() << std::endl;
           std::cout << "Pathname:       " << system[i]->getPathname() << std::endl;
+          std::cout << "Display name:   " << system[i]->getDisplayName() << std::endl;
           std::cout << "GenTL version   " << system[i]->getMajorVersion() << "."
                     << system[i]->getMinorVersion() << std::endl;
           std::cout << std::endl;
@@ -403,8 +405,8 @@ int main(int argc, char *argv[])
               }
               else
               {
-                std::cerr << "Missing '=': " << p << std::endl;
-                exit(1);
+                // call the command
+                rcg::callCommand(nodemap, p.c_str(), true);
               }
             }
 

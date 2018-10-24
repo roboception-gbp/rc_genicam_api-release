@@ -1,3 +1,41 @@
+2.0.0 (2018-10-08)
+------------------
+
+NOTE: Including multipart support required minor changes of the existing API. See readme for more
+information. Attention: The provided GenTL layer does not yet support multipart!
+
+- Extended Buffer and Image classes as well as the examples for handling multi-part buffers as well
+  (NOTE: The provided GenTL producer does not yet support multipart!)
+- gc_stream: Using component name for storing individual images and ensuring that files are not
+  overwritten
+- gc_pointcloud: Using component name for identifying images and try enabling synchronization on
+  device
+- Add libs of GenICam reference implementation to external cmake dependencies of shared
+  genicam_api library
+- Upgrading GenICam reference implementation to v3.1
+- Add libs of GenICam reference implementation to external dependencies of shared genicam_api
+  library
+
+1.3.15 (2018-09-27)
+-------------------
+
+- Added parameter --iponly to gc_config tool
+
+1.3.14 (2018-09-26)
+-------------------
+
+- Added possibility to interrupt streaming with gc_stream by pressing 'Enter' key.
+- Undefined min/max macros in gc_pointcloud.cc on Windows to avoid compile errors
+
+1.3.13 (2018-08-23)
+-------------------
+
+- Changed output of gc_config -l to emphasize using interface and serial number as unique identifier
+- Added possibility to call a GenICam command from the command line with gc_info, gc_config and gc_stream
+- Additionally printing the internal name and display name of the GenTL producer in the gc_info tool
+- Update GEV GenTL provider from Baumer
+- Revision of readme
+
 1.3.12 (2018-07-18)
 -------------------
 
