@@ -13,6 +13,48 @@ Although the tools are meant to be useful when working in a shell or in a
 script, their main purpose is to serve as example on how to use the API for
 reading and setting parameters, streaming and synchronizing images.
 
+API changes in version 2.0.0
+----------------------------
+
+Version 2.0.0 introduced some API changes that require minor changes of
+programs that use the classes Buffer, Image and ImageList.
+
+An object of class Buffer can now represents a single buffer as well as a
+multipart buffer, depending on the availability of multipart support in the
+used GenTL producer and the GigE vision device. Multipart buffers can contain
+more than one image. For simplicity of the interface, non-multipart buffers are
+now treated like multipart buffers with just one image.
+
+For writing code that is able to support multipart, after grabbing the buffer,
+the number of parts must be requested with the method
+Buffer::getNumberOfParts() and a loop must be added to cycle over all parts.
+All methods that access image specific data have been extended by a second
+parameter for providing the 0 based part index. The following existing
+methods have been changed:
+
+- void    *Buffer::getBase(std::uint32_t part) const;
+- size_t   Buffer::getSize(std::uint32_t part) const;
+- size_t   Buffer::getWidth(std::uint32_t part) const;
+- size_t   Buffer::getHeight(std::uint32_t part) const;
+- size_t   Buffer::getXOffset(std::uint32_t part) const;
+- size_t   Buffer::getYOffset(std::uint32_t part) const;
+- size_t   Buffer::getXPadding(std::uint32_t part) const;
+- bool     Buffer::getImagePresent(std::uint32_t part) const;
+- uint64_t Buffer::getPixelFormat(std::uint32_t part) const;
+- uint64_t Buffer::getPixelFormatNamespace(std::uint32_t part) const;
+- size_t   Buffer::getDeliveredImageHeight(std::uint32_t part) const;
+-          Image::Image(const Buffer *buffer, std::uint32_t part);
+- void     ImageList::add(const Buffer *buffer, size_t part);
+
+Another important change is to use the new method Buffer::getGlobalBase() for
+getting the address used to connect a buffer with the nodemap for accessing
+chunk parameters instead of Buffer::getBase(). Other, new methods include:
+
+- void    *Buffer::getGlobalBase() const;
+- size_t   Buffer::getGlobalSize() const;
+- size_t   Buffer::getPartDataType(uint32_t part) const;
+- uint64_t Buffer::getPartSourceID(std::uint32_t part) const;
+
 Compiling and Installing
 ------------------------
 
@@ -57,6 +99,10 @@ After installation, the install directory will contain three sub-directories.
 The 'bin' directory contains the tools, DLLs and the default transport layer
 including configuration. The 'include' and 'lib' sub-directories contain the
 headers and libraries for using the API in own programs.
+
+NOTE: For using the libraries in own projects, define the symbol
+`GENICAM_NO_AUTO_IMPLIB` in your project file to avoid linker problems with the
+GenICam libraries.
 
 Tools
 -----
@@ -115,12 +161,8 @@ Device ID
 
 There are multiple ways of specifying an ID to identify a device.
 
-1. In the most basic version, the device ID is actually defined by the GenTL
-   producer (see Transport Layer section below). The GenTL producer included
-   in rc_genicam_api uses the lower case MAC address with the colons `:`
-   replaced by underscores `_`.
-
-   Example: `00_14_2d_2c_6e_bb`
+1. The serial number of the device serves as ID.
+   Example: `02911931`
 
 2. The given ID can also be a user defined name. The user defined name is set
    to `rc_visard` by default and can be changed with:
@@ -133,8 +175,12 @@ There are multiple ways of specifying an ID to identify a device.
    If the user defined name contains one or more colons, it must be preceded by
    a colon (e.g. `:my:name`) or an interface ID (see below).
 
-3. The serial number of the device can also be used as ID.
-   Example: `02911931`
+3. The device ID of the GenTL producer (see `Transport Layer` section below)
+   may also be used. This ID is unique, but not persistent as it depends on the
+   implementation of the GenTL producer. Thus, it can change after software
+   updates. It often encodes the MAC address of the sensor in some way.
+
+   Example: `00_14_2d_2c_6e_bb`
 
 All three options can be seen in the output of `gc_config -l`.
 
