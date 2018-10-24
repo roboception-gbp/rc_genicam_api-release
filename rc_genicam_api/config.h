@@ -52,6 +52,20 @@ namespace rcg
 {
 
 /**
+  Calls the given command.
+
+  @param nodemap   Initialized nodemap.
+  @param name      Name of command.
+  @param exception True if an error should be signaled via exception instead of
+                   a return value.
+  @return          True if value has been changed. False if feature does not
+                   exist, has a different datatype or is not writable.
+*/
+
+bool callCommand(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const char *name,
+                 bool exception=false);
+
+/**
   Set the value of a boolean feature of the given nodemap.
 
   @param nodemap   Initialized nodemap.
@@ -273,6 +287,29 @@ void checkFeature(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const cha
 
 std::shared_ptr<GenApi::CChunkAdapter> getChunkAdapter(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap,
                                                        const std::string &tltype);
+
+
+/**
+  Returns the component name for the given part index of the buffer. It is
+  expected that chunk data has been enabled and the buffer that corresponds to
+  the part indes has been attached to the nodemap.
+
+  If this is not the case, or if the chunk data does not contain required
+  parameters, then the component name is guessed from the pixel format of the
+  requested part. The heuristic of this is designed for Roboceptions rc_visard.
+
+  @param nodemap Feature nodemap that should already have been attached to the
+                 buffer.
+  @param buffer  Buffer that should already have been attached to the nodemap.
+  @param part    Part index of buffer for which the component name is requested.
+  @return        Component name, which may be derived from the pixel format or
+                 an empty string if it cannot be determined.
+*/
+
+class Buffer;
+
+std::string getComponetOfPart(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap,
+                              const Buffer *buffer, uint32_t part);
 
 }
 

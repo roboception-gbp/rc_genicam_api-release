@@ -34,6 +34,7 @@
  */
 
 #include "config.h"
+#include "buffer.h"
 
 #include <stdexcept>
 #include <iomanip>
@@ -44,8 +45,56 @@
 #include <GenApi/ChunkAdapterU3V.h>
 #include <GenApi/ChunkAdapterGeneric.h>
 
+#include <rc_genicam_api/pixel_formats.h>
+
 namespace rcg
 {
+
+bool callCommand(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const char *name,
+                 bool exception)
+{
+  bool ret=false;
+
+  try
+  {
+    GenApi::INode *node=nodemap->_GetNode(name);
+
+    if (node != 0)
+    {
+      if (GenApi::IsWritable(node))
+      {
+        GenApi::ICommand *val=dynamic_cast<GenApi::ICommand *>(node);
+
+        if (val != 0)
+        {
+          val->Execute();
+          ret=true;
+        }
+        else if (exception)
+        {
+          throw std::invalid_argument(std::string("Feature not a command: ")+name);
+        }
+      }
+      else if (exception)
+      {
+        throw std::invalid_argument(std::string("Feature not writable: ")+name);
+      }
+    }
+    else if (exception)
+    {
+      throw std::invalid_argument(std::string("Feature not found: ")+name);
+    }
+  }
+  catch (const GENICAM_NAMESPACE::GenericException &ex)
+  {
+    if (exception)
+    {
+      throw std::invalid_argument(ex.what());
+    }
+  }
+
+  return ret;
+}
 
 bool setBoolean(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const char *name,
                 bool value, bool exception)
@@ -832,6 +881,88 @@ std::shared_ptr<GenApi::CChunkAdapter> getChunkAdapter(const std::shared_ptr<Gen
   }
 
   return chunkadapter;
+}
+
+std::string getComponetOfPart(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap,
+                              const rcg::Buffer *buffer, uint32_t ipart)
+{
+  std::string component;
+
+  try
+  {
+    // get chunk component selector and proprietary chunk part index parmeters
+
+    GenApi::IEnumeration *sel=dynamic_cast<GenApi::IEnumeration *>(nodemap->_GetNode("ChunkComponentSelector"));
+    GenApi::IInteger *part=dynamic_cast<GenApi::IInteger *>(nodemap->_GetNode("ChunkPartIndex"));
+
+    if (sel != 0 && part != 0)
+    {
+      if (GenApi::IsReadable(sel) && GenApi::IsWritable(sel) && GenApi::IsReadable(part))
+      {
+        // go through all available enumerations
+
+        GenApi::NodeList_t list;
+        sel->GetEntries(list);
+
+        for (size_t i=0; i<list.size() && component.size() == 0; i++)
+        {
+          GenApi::IEnumEntry *entry=dynamic_cast<GenApi::IEnumEntry *>(list[i]);
+
+          if (entry != 0 && GenApi::IsReadable(entry))
+          {
+            sel->SetIntValue(entry->GetValue());
+
+            int64_t val=part->GetValue();
+            if (val == ipart)
+            {
+              component=dynamic_cast<GenApi::IEnumEntry *>(list[i])->GetSymbolic();
+            }
+          }
+        }
+      }
+    }
+  }
+  catch (const std::exception &)
+  { /* ignore errors */ }
+  catch (const GENICAM_NAMESPACE::GenericException &)
+  { /* ignore errors */ }
+
+  // try guessing component name from pixel format
+
+  if (component.size() == 0 && buffer->getImagePresent(ipart))
+  {
+    switch (buffer->getPixelFormat(ipart))
+    {
+      case Mono8:
+      case YCbCr411_8:
+        if (buffer->getWidth(ipart) >= buffer->getHeight(ipart))
+        {
+          component="Intensity";
+        }
+        else
+        {
+          component="IntensityCombined";
+        }
+        break;
+
+      case Coord3D_C16:
+        component="Disparity";
+        break;
+
+      case Confidence8:
+        component="Confidence";
+        break;
+
+      case Error8:
+        component="Error";
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  return component;
 }
 
 }
