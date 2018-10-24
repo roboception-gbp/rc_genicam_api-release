@@ -44,10 +44,18 @@
 
 #include <rc_genicam_api/pixel_formats.h>
 
+#include <Base/GCException.h>
+
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <cmath>
+#include <algorithm>
+
+#ifdef WIN32
+#undef min
+#undef max
+#endif
 
 namespace
 {
@@ -78,19 +86,19 @@ void printHelp(const char *prgname)
   @param i         Index of 16 bit inside the given array.
 */
 
-inline uint16_t getUint16(const uint8_t *p, bool bigendian, int i)
+inline uint16_t getUint16(const uint8_t *p, bool bigendian, size_t i)
 {
   uint16_t ret;
 
   if (bigendian)
   {
     size_t j=i<<1;
-    ret=((p[j]<<8)|p[j+1]);
+    ret=static_cast<uint16_t>(((p[j]<<8)|p[j+1]));
   }
   else
   {
     size_t j=i<<1;
-    ret=((p[j+1]<<8)|p[j]);
+    ret=static_cast<uint16_t>(((p[j+1]<<8)|p[j]));
   }
 
   return ret;
@@ -140,11 +148,11 @@ void storePointCloud(std::string name, double f, double t, double scale,
   // count number of valid disparities and store vertice index in a temporary
   // index image
 
-  int vi=0;
+  size_t vi=0;
   const uint32_t vinvalid=0xffffffff;
   std::vector<uint32_t> vindex(width*height);
 
-  int n=0;
+  uint32_t n=0;
   for (size_t k=0; k<height; k++)
   {
     int j=0;
@@ -346,33 +354,33 @@ void storePointCloud(std::string name, double f, double t, double scale,
       if (valid >= 3 && vmax-vmin <= vstep)
       {
         int j=0;
-        uint32_t f[4];
+        uint32_t fc[4];
 
         if (ips[i-1] != vinvalid)
         {
-          f[j++]=ips[i-1];
+          fc[j++]=ips[i-1];
         }
 
         if (ips[width+i-1] != vinvalid)
         {
-          f[j++]=ips[width+i-1];
+          fc[j++]=ips[width+i-1];
         }
 
         if (ips[width+i] != vinvalid)
         {
-          f[j++]=ips[width+i];
+          fc[j++]=ips[width+i];
         }
 
         if (ips[i] != vinvalid)
         {
-          f[j++]=ips[i];
+          fc[j++]=ips[i];
         }
 
-        out << "3 " << f[0] << ' ' << f[1] << ' ' << f[2] << std::endl;
+        out << "3 " << fc[0] << ' ' << fc[1] << ' ' << fc[2] << std::endl;
 
         if (j == 4)
         {
-          out << "3 " << f[2] << ' ' << f[3] << ' ' << f[0] << std::endl;
+          out << "3 " << fc[2] << ' ' << fc[3] << ' ' << fc[0] << std::endl;
         }
       }
     }
@@ -429,6 +437,11 @@ int main(int argc, char *argv[])
       dev->open(rcg::Device::CONTROL);
       std::shared_ptr<GenApi::CNodeMapRef> nodemap=dev->getRemoteNodeMap();
 
+      // get chunk adapter (this switches chunk mode on if possible and
+      // returns a null pointer if this is not possible)
+
+      std::shared_ptr<GenApi::CChunkAdapter> chunkadapter=rcg::getChunkAdapter(nodemap, dev->getTLType());
+
       // get focal length, baseline and disparity scale factor
 
       double f=rcg::getFloat(nodemap, "FocalLengthFactor", 0, 0, false);
@@ -476,22 +489,28 @@ int main(int argc, char *argv[])
 
       rcg::setEnum(nodemap, "PixelFormat", "YCbCr411_8", false);
 
-      // enable left image and disparity image and disable all other streams
+      // enable left image, disparity, confidence and error image and disable
+      // all others
 
       {
         std::vector<std::string> component;
 
         rcg::getEnum(nodemap, "ComponentSelector", component, true);
 
-        for (size_t i=0; i<component.size(); i++)
+        for (size_t k=0; k<component.size(); k++)
         {
-          rcg::setEnum(nodemap, "ComponentSelector", component[i].c_str(), true);
+          rcg::setEnum(nodemap, "ComponentSelector", component[k].c_str(), true);
 
-          bool enable=(component[i] == "Intensity" || component[i] == "Disparity" ||
-                       component[i] == "Confidence" || component[i] == "Error");
+          bool enable=(component[k] == "Intensity" || component[k] == "Disparity" ||
+                       component[k] == "Confidence" || component[k] == "Error");
           rcg::setBoolean(nodemap, "ComponentEnable", enable, true);
         }
       }
+
+      // try getting synchronized data (which only has an effect if the device
+      // and GenTL producer support multipart)
+
+      rcg::setString(nodemap, "AcquisitionMultiPartMode", "SynchronizedComponents");
 
       // open image stream
 
@@ -519,80 +538,103 @@ int main(int argc, char *argv[])
         {
           async++;
 
-          // grab next image with timeout of 0.5 seconds
+          // grab next image with timeout
 
-          const rcg::Buffer *buffer=stream[0]->grab(500);
+          const rcg::Buffer *buffer=stream[0]->grab(5000);
           if (buffer != 0)
           {
             // check for a complete image in the buffer
 
-            if (!buffer->getIsIncomplete() && buffer->getImagePresent())
+            if (!buffer->getIsIncomplete())
             {
-              // store image in the corresponding list
+              // attach buffer to nodemap for accessing chunk data if possible
 
-              uint64_t left_tol=0;
-              uint64_t disp_tol=0;
-
-              uint64_t pixelformat=buffer->getPixelFormat();
-              if (pixelformat == Mono8 || pixelformat == YCbCr411_8)
+              if (chunkadapter)
               {
-                left_list.add(buffer);
-                disp_tol=tol;
-              }
-              else if (pixelformat == Coord3D_C16)
-              {
-                disp_list.add(buffer);
-                left_tol=tol;
-              }
-              else if (pixelformat == Confidence8)
-              {
-                conf_list.add(buffer);
-                left_tol=tol;
-              }
-              else if (pixelformat == Error8)
-              {
-                error_list.add(buffer);
-                left_tol=tol;
+                chunkadapter->AttachBuffer(
+                  reinterpret_cast<std::uint8_t *>(buffer->getGlobalBase()),
+                                                   static_cast<int64_t>(buffer->getSizeFilled()));
               }
 
-              // get corresponding left and disparity images
+              // go through all parts in case of multi-part buffer
 
-              uint64_t timestamp=buffer->getTimestampNS();
-              std::shared_ptr<const rcg::Image> left=left_list.find(timestamp, left_tol);
-              std::shared_ptr<const rcg::Image> disp=disp_list.find(timestamp, disp_tol);
-
-              // get confidence and error images that correspond to the
-              // disparity image
-
-              std::shared_ptr<const rcg::Image> conf;
-              std::shared_ptr<const rcg::Image> error;
-
-              if (disp)
+              size_t partn=buffer->getNumberOfParts();
+              for (uint32_t part=0; part<partn; part++)
               {
-                conf=conf_list.find(disp->getTimestampNS());
-                error=error_list.find(disp->getTimestampNS());
+                if (buffer->getImagePresent(part))
+                {
+                  // store image in the corresponding list
+
+                  uint64_t left_tol=0;
+                  uint64_t disp_tol=0;
+
+                  std::string component=rcg::getComponetOfPart(nodemap, buffer, part);
+
+                  if (component == "Intensity")
+                  {
+                    left_list.add(buffer, part);
+                    disp_tol=tol;
+                  }
+                  else if (component == "Disparity")
+                  {
+                    disp_list.add(buffer, part);
+                    left_tol=tol;
+                  }
+                  else if (component == "Confidence")
+                  {
+                    conf_list.add(buffer, part);
+                    left_tol=tol;
+                  }
+                  else if (component == "Error")
+                  {
+                    error_list.add(buffer, part);
+                    left_tol=tol;
+                  }
+
+                  // get corresponding left and disparity images
+
+                  uint64_t timestamp=buffer->getTimestampNS();
+                  std::shared_ptr<const rcg::Image> left=left_list.find(timestamp, left_tol);
+                  std::shared_ptr<const rcg::Image> disp=disp_list.find(timestamp, disp_tol);
+
+                  // get confidence and error images that correspond to the
+                  // disparity image
+
+                  std::shared_ptr<const rcg::Image> conf;
+                  std::shared_ptr<const rcg::Image> error;
+
+                  if (disp)
+                  {
+                    conf=conf_list.find(disp->getTimestampNS());
+                    error=error_list.find(disp->getTimestampNS());
+                  }
+
+                  if (left && disp && conf && error)
+                  {
+                    // compute and store point cloud from synchronized image pair
+
+                    storePointCloud(name, f, t, scale, left, disp, conf, error);
+
+                    // remove all images from the buffer with the current or an
+                    // older time stamp
+
+                    async=0;
+                    left_list.removeOld(timestamp);
+                    disp_list.removeOld(timestamp);
+                    conf_list.removeOld(timestamp);
+                    error_list.removeOld(timestamp);
+
+                    // in this example, we exit the grabbing loop after receiving
+                    // the first synchronized image pair
+
+                    run=false;
+                  }
+                }
               }
 
-              if (left && disp && conf && error)
-              {
-                // compute and store point cloud from synchronized image pair
+              // detach buffer from nodemap
 
-                storePointCloud(name, f, t, scale, left, disp, conf, error);
-
-                // remove all images from the buffer with the current or an
-                // older time stamp
-
-                async=0;
-                left_list.removeOld(timestamp);
-                disp_list.removeOld(timestamp);
-                conf_list.removeOld(timestamp);
-                error_list.removeOld(timestamp);
-
-                // in this example, we exit the grabbing loop after receiving
-                // the first synchronized image pair
-
-                run=false;
-              }
+              if (chunkadapter) chunkadapter->DetachBuffer();
             }
           }
           else
@@ -631,6 +673,14 @@ int main(int argc, char *argv[])
   catch (const std::exception &ex)
   {
     std::cerr << ex.what() << std::endl;
+  }
+  catch (const GENICAM_NAMESPACE::GenericException &ex)
+  {
+    std::cerr << "Exception: " << ex.what() << std::endl;
+  }
+  catch (...)
+  {
+    std::cerr << "Unknown exception!" << std::endl;
   }
 
   rcg::System::clearSystems();
