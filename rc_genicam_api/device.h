@@ -38,6 +38,8 @@
 
 #include "interface.h"
 
+#include <mutex>
+
 namespace rcg
 {
 
@@ -98,7 +100,8 @@ class Device : public std::enable_shared_from_this<Device>
     /**
       Returns the currently available streams of this device.
 
-      NOTE: open() must be called before calling this method.
+      NOTE: The device must have been opened with the open() call before
+      calling this method.
 
       @return List of streams.
     */
@@ -108,101 +111,110 @@ class Device : public std::enable_shared_from_this<Device>
     /**
       Returns the vendor of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Vendor.
     */
 
-    std::string getVendor() const;
+    std::string getVendor();
 
     /**
       Returns the model of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Model.
     */
 
-    std::string getModel() const;
+    std::string getModel();
 
     /**
       Returns the transport layer type of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Transport layer type.
     */
 
-    std::string getTLType() const;
+    std::string getTLType();
 
     /**
       Returns the display name of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Display name.
     */
 
-    std::string getDisplayName() const;
+    std::string getDisplayName();
 
     /**
       Returns the access status of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Access status.
     */
 
-    std::string getAccessStatus() const;
+    std::string getAccessStatus();
 
     /**
       Returns the user defined name of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return User defined name.
     */
 
-    std::string getUserDefinedName() const;
+    std::string getUserDefinedName();
 
     /**
       Returns the serial number of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Serial number.
     */
 
-    std::string getSerialNumber() const;
+    std::string getSerialNumber();
 
     /**
       Returns the version of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Version.
     */
 
-    std::string getVersion() const;
+    std::string getVersion();
 
     /**
       Returns the timestamp frequency of the device.
 
-      NOTE: At least the parent object must have been opened before calling
-      this method.
+      NOTE: This method only returns a non empty string if the parent interface
+      has NOT been closed after Interface::getDevice() or Interface::getDevices()
+      call, or if this device itself has been opened with the open() call.
 
       @return Tick-frequency of the time stamp clock.
     */
 
-    uint64_t getTimestampFrequency() const;
+    uint64_t getTimestampFrequency();
 
     /**
       Returns the node map of this object.
@@ -229,7 +241,7 @@ class Device : public std::enable_shared_from_this<Device>
     std::shared_ptr<GenApi::CNodeMapRef> getRemoteNodeMap(const char *xml=0);
 
     /**
-      Get internal interace handle.
+      Get internal interface handle.
 
       @return Internal handle.
     */
@@ -244,6 +256,8 @@ class Device : public std::enable_shared_from_this<Device>
     std::shared_ptr<Interface> parent;
     std::shared_ptr<const GenTLWrapper> gentl;
     std::string id;
+
+    std::mutex mtx;
 
     int n_open;
     void *dev;
