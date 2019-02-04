@@ -1,3 +1,20 @@
+2.1.0 (2019-01-25)
+------------------
+
+- Made System, Interface, Device and Stream objects thread safe
+
+2.0.4 (2019-01-24)
+------------------
+
+- A buffer that is labelled to contain chunk data may also contain an image
+- Implemented fallback of open device access from readonly to control to exclusive
+
+2.0.3 (2019-01-09)
+------------------
+
+- Improved description of some device methods
+- Under Windows, do not check install path but only current directory as default location of GenTL producer
+
 2.0.2 (2019-01-01)
 ------------------
 
