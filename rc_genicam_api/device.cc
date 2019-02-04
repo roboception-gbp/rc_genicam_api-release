@@ -84,29 +84,47 @@ const std::string &Device::getID() const
 
 void Device::open(ACCESS access)
 {
+  std::lock_guard<std::mutex> lock(mtx);
+
   if (n_open == 0)
   {
     parent->open();
 
-    GenTL::DEVICE_ACCESS_FLAGS mode;
+    // convert access mode to GenTL flags
 
+    GenTL::DEVICE_ACCESS_FLAGS mode[]={GenTL::DEVICE_ACCESS_READONLY,
+      GenTL::DEVICE_ACCESS_CONTROL, GenTL::DEVICE_ACCESS_EXCLUSIVE};
+
+    int i=0;
     switch (access)
     {
       case READONLY:
-        mode=GenTL::DEVICE_ACCESS_READONLY;
+        i=0;
         break;
 
       case CONTROL:
-        mode=GenTL::DEVICE_ACCESS_CONTROL;
+        i=1;
         break;
 
       default:
       case EXCLUSIVE:
-        mode=GenTL::DEVICE_ACCESS_EXCLUSIVE;
+        i=2;
         break;
     }
 
-    if (gentl->IFOpenDevice(parent->getHandle(), id.c_str(), mode, &dev) != GenTL::GC_ERR_SUCCESS)
+    // open device (if readonly fails, try control; if control fails try
+    // exclusive)
+
+    GenTL::GC_ERROR err = GenTL::GC_ERR_NOT_IMPLEMENTED;
+    while (err == GenTL::GC_ERR_NOT_IMPLEMENTED && i < 3)
+    {
+      err=gentl->IFOpenDevice(parent->getHandle(), id.c_str(), mode[i], &dev);
+      i++;
+    }
+
+    // check if open was successful
+
+    if (err != GenTL::GC_ERR_SUCCESS)
     {
       parent->close();
       throw GenTLException("Device::open() failed", gentl);
@@ -118,6 +136,8 @@ void Device::open(ACCESS access)
 
 void Device::close()
 {
+  std::lock_guard<std::mutex> lock(mtx);
+
   if (n_open > 0)
   {
     n_open--;
@@ -159,6 +179,8 @@ int find(const std::vector<std::shared_ptr<Stream> > &list, const std::string &i
 
 std::vector<std::shared_ptr<Stream> > Device::getStreams()
 {
+  std::lock_guard<std::mutex> lock(mtx);
+
   std::vector<std::shared_ptr<Stream> > ret;
 
   if (dev != 0)
@@ -256,28 +278,33 @@ std::string cDevGetInfo(const Device *obj, const std::shared_ptr<const GenTLWrap
 
 }
 
-std::string Device::getVendor() const
+std::string Device::getVendor()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_VENDOR);
 }
 
-std::string Device::getModel() const
+std::string Device::getModel()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_MODEL);
 }
 
-std::string Device::getTLType() const
+std::string Device::getTLType()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_TLTYPE);
 }
 
-std::string Device::getDisplayName() const
+std::string Device::getDisplayName()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_DISPLAYNAME);
 }
 
-std::string Device::getAccessStatus() const
+std::string Device::getAccessStatus()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   std::string ret;
 
   GenTL::INFO_DATATYPE type=GenTL::INFO_DATATYPE_UNKNOWN;
@@ -335,23 +362,27 @@ std::string Device::getAccessStatus() const
   return ret;
 }
 
-std::string Device::getUserDefinedName() const
+std::string Device::getUserDefinedName()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_USER_DEFINED_NAME);
 }
 
-std::string Device::getSerialNumber() const
+std::string Device::getSerialNumber()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_SERIAL_NUMBER);
 }
 
-std::string Device::getVersion() const
+std::string Device::getVersion()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_VERSION);
 }
 
-uint64_t Device::getTimestampFrequency() const
+uint64_t Device::getTimestampFrequency()
 {
+  std::lock_guard<std::mutex> lock(mtx);
   GenTL::INFO_DATATYPE type;
   uint64_t freq=0;
   size_t size=sizeof(freq);
@@ -371,6 +402,8 @@ uint64_t Device::getTimestampFrequency() const
 
 std::shared_ptr<GenApi::CNodeMapRef> Device::getNodeMap()
 {
+  std::lock_guard<std::mutex> lock(mtx);
+
   if (dev != 0 && !nodemap)
   {
     cport=std::shared_ptr<CPort>(new CPort(gentl, &dev));
@@ -382,6 +415,8 @@ std::shared_ptr<GenApi::CNodeMapRef> Device::getNodeMap()
 
 std::shared_ptr<GenApi::CNodeMapRef> Device::getRemoteNodeMap(const char *xml)
 {
+  std::lock_guard<std::mutex> lock(mtx);
+
   if (dev != 0 && !rnodemap)
   {
     if (gentl->DevGetPort(dev, &rp) == GenTL::GC_ERR_SUCCESS)
