@@ -1,3 +1,31 @@
+2.2.0 (2019-05-02)
+------------------
+
+- gc_info does not report not implemented parameters any more
+- gc_info can now also only print specified nodes (which can be a category) by appending the node name with '?' to the device id.
+- gc_stream can now measure frequency and latency of incomming buffers
+- Windows: look for transport layer in folder of rc_genicam_api.dll
+- support modern cmake
+  - A "meta target" for all Genicam targets is defined, rc_genicam_api::genicam, on which rc_genicam_api::rc_genicam_api depends publicly.
+  - Compile options and definitions of rc_genicam_api are set to private, only /DGENICAM_NO_AUTO_IMPLIB is public
+  - Install paths are defined using GNUInstallDirs
+- update Baumer GenTL providers to 2.9.2.22969
+  - Support for payload type Multi-part added
+  - The GigE Producer now find devices connected to virtual interfaces for Linux
+
+2.1.2 (2019-03-13)
+------------------
+
+- Remove global include_directories in cmake build files
+- Use full precision timestamp in name of images saved by gc_stream
+- Append out1 and out2 state to name of images saved by gc_stream
+
+2.1.1 (2019-02-21)
+------------------
+
+- Command line tools now exit with != 0 in case of an error
+- Improved cmake project files
+
 2.1.0 (2019-01-25)
 ------------------
 

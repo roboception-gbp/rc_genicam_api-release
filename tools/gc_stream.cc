@@ -53,8 +53,9 @@
 #include <algorithm>
 #include <atomic>
 #include <thread>
+#include <chrono>
 
-#ifdef WIN32
+#ifdef _WIN32
 #undef min
 #undef max
 #endif
@@ -115,19 +116,31 @@ std::string ensureNewName(std::string name)
   Store image given in buffer in PGM or PPM format.
 */
 
-std::string storeBuffer(const std::string &component, const rcg::Buffer *buffer, uint32_t part)
+std::string storeBuffer(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap,
+                        const std::shared_ptr<GenApi::CChunkAdapter> &chunkadapter,
+                        const std::string &component, const rcg::Buffer *buffer, uint32_t part)
 {
   // prepare file name
 
   std::ostringstream name;
 
-  double t=buffer->getTimestampNS()/1000000000.0;
+  uint64_t t_sec = buffer->getTimestampNS()/1000000000;
+  uint64_t t_nsec = buffer->getTimestampNS()%1000000000;
 
-  name << "image_" << std::setprecision(16) << t;
+  name << "image_" << t_sec << "." << std::setfill('0') << std::setw(9) << t_nsec;
 
   if (component.size() > 0)
   {
     name << '_' << component;
+  }
+
+  if (chunkadapter)
+  {
+    // Append out1 and out2 status to file name: _<out1>_<out2>
+    std::int64_t line_status=rcg::getInteger(nodemap, "ChunkLineStatusAll");
+    bool out1 = line_status & 0x01;
+    bool out2 = line_status & 0x02;
+    name << "_" << std::noboolalpha << out1 << "_" << out2;
   }
 
   // store image (see e.g. the sv tool of cvkit for show images)
@@ -312,9 +325,10 @@ std::string storeBufferAsDisparity(const std::shared_ptr<GenApi::CNodeMapRef> &n
 
       std::ostringstream name;
 
-      double ts=buffer->getTimestampNS()/1000000000.0;
+      uint64_t t_sec = buffer->getTimestampNS()/1000000000;
+      uint64_t t_nsec = buffer->getTimestampNS()%1000000000;
 
-      name << "image_" << std::setprecision(16) << ts;
+      name << "image_" << t_sec << "." << std::setfill('0') << std::setw(9) << t_nsec;
 
       // convert values and store disparity image
 
@@ -324,7 +338,16 @@ std::string storeBufferAsDisparity(const std::shared_ptr<GenApi::CNodeMapRef> &n
       const unsigned char *p=static_cast<const unsigned char *>(buffer->getBase(part))+
                              2*(width+px)*(height+1);
 
-      dispname=name.str()+"_Disparity.pfm";
+      name << "_Disparity";
+
+      // Append out1 and out2 status to file name: _<out1>_<out2>
+      std::int64_t line_status=rcg::getInteger(nodemap, "ChunkLineStatusAll");
+      bool out1 = line_status & 0x01;
+      bool out2 = line_status & 0x02;
+      name << "_" << std::noboolalpha << out1 << "_" << out2;
+
+      dispname=name.str()+".pfm";
+
       std::ofstream out(ensureNewName(dispname), std::ios::binary);
 
       out << "Pf" << std::endl;
@@ -397,7 +420,10 @@ std::string storeBufferAsDisparity(const std::shared_ptr<GenApi::CNodeMapRef> &n
       out.open(ensureNewName(name.str()));
 
       out << "# Created by gc_stream" << std::endl;
+      out << std::fixed << std::setprecision(5);
       out << "camera.A=[" << f << " 0 " << u << "; 0 " << f << " " << v << "; 0 0 1]" << std::endl;
+      out << "camera.height=" << height << std::endl;
+      out << "camera.width=" << width << std::endl;
       out << "rho=" << f*t << std::endl;
       out << "t=" << t << std::endl;
 
@@ -420,7 +446,7 @@ void interruptHandler(int)
   user_interrupt=true;
 }
 
-#ifdef WIN32
+#ifdef _WIN32
 
 void checkUserInterrupt()
 {
@@ -438,6 +464,8 @@ void checkUserInterrupt()
 
 int main(int argc, char *argv[])
 {
+  int ret=0;
+
   signal(SIGINT, interruptHandler);
 
   try
@@ -454,7 +482,7 @@ int main(int argc, char *argv[])
       }
     }
 
-    if (i < argc)
+    if (i < argc && std::string(argv[i]) != "-h")
     {
       // find specific device accross all systems and interfaces and open it
 
@@ -536,7 +564,7 @@ int main(int argc, char *argv[])
 
         if (stream.size() > 0)
         {
-#ifdef WIN32
+#ifdef _WIN32
           // start background thread for checking user input
           std::thread thread_cui(checkUserInterrupt);
           thread_cui.detach();
@@ -549,13 +577,15 @@ int main(int argc, char *argv[])
 
           std::cout << "Package size: " << rcg::getString(nodemap, "GevSCPSPacketSize") << std::endl;
 
-#ifdef WIN32
+#ifdef _WIN32
           std::cout << "Press 'Enter' to abort grabbing." << std::endl;
 #endif
           std::cout << std::endl;
 
           int buffers_received=0;
           int buffers_incomplete=0;
+          auto time_start=std::chrono::steady_clock::now();
+          double latency_ns=0;
 
           for (int k=0; k<n && !user_interrupt; k++)
           {
@@ -607,7 +637,7 @@ int main(int argc, char *argv[])
 
                         if (name.size() == 0)
                         {
-                          name=storeBuffer(component, buffer, part);
+                          name=storeBuffer(nodemap, chunkadapter, component, buffer, part);
                         }
 
                         // report success
@@ -622,9 +652,21 @@ int main(int argc, char *argv[])
                   }
                   else
                   {
-                    std::cout << "Received buffer with timestamp: " << std::setprecision(16)
-                              << buffer->getTimestampNS()/1.9e9 << std::endl;
+                    // just print timestamp of received buffer
+
+                    uint64_t t_sec = buffer->getTimestampNS()/1000000000;
+                    uint64_t t_nsec = buffer->getTimestampNS()%1000000000;
+
+                    std::cout << "Received buffer with timestamp: " << t_sec << "."
+                              << std::setfill('0') << std::setw(9) << t_nsec << std::endl;
                     retry=0;
+
+                    // accumulate mean latency
+
+                    auto current=std::chrono::system_clock::now();
+                    latency_ns+=
+                      static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(current.time_since_epoch()).count())-
+                      static_cast<double>(buffer->getTimestampNS());
                   }
 
                   // detach buffer from nodemap
@@ -650,13 +692,39 @@ int main(int argc, char *argv[])
           stream[0]->stopStreaming();
           stream[0]->close();
 
+          // report received and incomplete buffers
+
           std::cout << std::endl;
           std::cout << "Received buffers:   " << buffers_received << std::endl;
           std::cout << "Incomplete buffers: " << buffers_incomplete << std::endl;
+
+          auto time_stop=std::chrono::steady_clock::now();
+          std::cout << "Buffers per second: " << std::setprecision(3)
+                    << 1000.0*buffers_received/std::chrono::duration_cast<std::chrono::milliseconds>(time_stop-time_start).count()
+                    << std::endl;
+
+          if (!store)
+          {
+            if (buffers_received-buffers_incomplete > 0)
+            {
+              latency_ns/=buffers_received-buffers_incomplete;
+            }
+
+            std::cout << "Mean latency:       " << std::setprecision(5) << latency_ns/1.0e6
+                      << " ms (only meaningful if camera is synchronized e.g. via PTP!)" << std::endl;
+          }
+
+          // return error code if no images could be received
+
+          if (buffers_incomplete == buffers_received)
+          {
+            ret=1;
+          }
         }
         else
         {
           std::cerr << "No streams available" << std::endl;
+          ret=1;
         }
 
         dev->close();
@@ -664,41 +732,50 @@ int main(int argc, char *argv[])
       else
       {
         std::cerr << "Device '" << argv[1] << "' not found!" << std::endl;
+        ret=1;
       }
     }
     else
     {
       // show help
 
-      std::cout << argv[0] << " [-t] [<interface-id>:]<device-id> [n=<n>] [<key>=<value>] ..." << std::endl;
+      std::cout << argv[0] << " -h | [-t] [<interface-id>:]<device-id> [n=<n>] [<key>=<value>] ..." << std::endl;
       std::cout << std::endl;
-      std::cout << "- Stores n images from the specified device after applying the given values." << std::endl;
-#ifdef WIN32
-      std::cout << "- Streaming can be aborted by hitting the 'Enter' key." << std::endl;
+      std::cout << "Stores images from the specified device after applying the given optional GenICam parameters." << std::endl;
+      std::cout << std::endl;
+      std::cout << "Options:" << std::endl;
+      std::cout << "-h   Prints help information and exits" << std::endl;
+      std::cout << "-t   Testmode, which does not store images and provides extended statistics" << std::endl;
+      std::cout << std::endl;
+      std::cout << "Parameters:" << std::endl;
+      std::cout << "<interface-id> Optional GenICam ID of interface for connecting to the device" << std::endl;
+      std::cout << "<device-id>    GenICam device ID, serial number or user defined name of device" << std::endl;
+      std::cout << "n=<n>          Optional number of images to be received (default is 1)" << std::endl;
+      std::cout << "<key>=<value>  Optional GenICam parameters to be changed in the given order" << std::endl;
+#ifdef _WIN32
+      std::cout << std::endl;
+      std::cout << "Streaming can be aborted by hitting the 'Enter' key." << std::endl;
 #endif
-      std::cout << "- Components can be enabled with 'ComponentSelector=<component> ComponentEnable=1'." << std::endl;
-      std::cout << std::endl;
-      std::cout << "Parameter '-t' switches to test mode, which prevents storing images." << std::endl;
-      std::cout << std::endl;
-      std::cout << "<device-id>   Device from which data will be streamed" << std::endl;
-      std::cout << "n=<n>         Number of images to receive. Default is 1" << std::endl;
-      std::cout << "<key>=<value> Values set via GenICam before streaming images" << std::endl;
+      ret=1;
     }
   }
   catch (const std::exception &ex)
   {
     std::cerr << "Exception: " << ex.what() << std::endl;
+    ret=2;
   }
   catch (const GENICAM_NAMESPACE::GenericException &ex)
   {
     std::cerr << "Exception: " << ex.what() << std::endl;
+    ret=2;
   }
   catch (...)
   {
     std::cerr << "Unknown exception!" << std::endl;
+    ret=2;
   }
 
   rcg::System::clearSystems();
 
-  return 0;
+  return ret;
 }
