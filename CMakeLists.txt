@@ -31,15 +31,21 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.5.1)
 
 project(rc_genicam_api)
+
+include(cmake/install_dirs.cmake)
+include(cmake/project_name.cmake)
 include(cmake/project_version.cmake)
 
-enable_testing()
+# For CMake Version >= 3.0: issue FATAL_ERROR if link dependency contains
+# double-colons but is not an imported target.
+if (POLICY CMP0028)
+  cmake_policy(SET CMP0028 NEW)
+endif ()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/genicam/library/CPP/include)
+enable_testing()
 
 # - Configuration for code optimization -
 
@@ -48,48 +54,9 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 # - Standard definitions -
-
-add_definitions(-Wall)
-if (CMAKE_MAJOR_VERSION VERSION_LESS "3.1.0")
-  add_definitions(-std=c++11)
-else ()
-  set(CMAKE_CXX_STANDARD 11)
-endif ()
-
-if (CMAKE_COMPILER_IS_GNUCC)
-  add_definitions(-Wno-unknown-pragmas)
-endif ()
-
-# In case of Visual Studio, enable exporting all symbols and disable some
-# warnings
-
+set(CMAKE_CXX_STANDARD 11)
 if (WIN32)
-  add_definitions(/DGENICAM_NO_AUTO_IMPLIB)
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
-endif ()
-
-if (MSVC)
-  add_definitions("/wd4003")
-  add_definitions("/wd4514")
-  add_definitions("/wd4710")
-  add_definitions("/wd4820")
-  add_definitions("/wd4435")
-  add_definitions("/wd4668")
-  add_definitions("/wd4127")
-  add_definitions("/wd4265")
-  add_definitions("/wd4996")
-  add_definitions("/wd4437")
-  add_definitions("/wd4571")
-  add_definitions("/wd4355")
-  add_definitions("/wd4061")
-  add_definitions("/wd4800")
-  add_definitions("/wd4711")
-  add_definitions("/wd4774")
-  add_definitions("/wd4625")
-  add_definitions("/wd4626")
-  add_definitions("/wd5026")
-  add_definitions("/wd5027")
-  add_definitions("/wd5039")
 endif ()
 
 # - Options -
@@ -100,11 +67,17 @@ option(BUILD_SHARED_LIBS "Build shared libs" ON)
 option(INSTALL_COMPLETION "Install bash completion" OFF)
 
 # - Build individual parts -
+find_package(Genicam REQUIRED NO_CMAKE_PATH PATHS ${CMAKE_CURRENT_SOURCE_DIR}/genicam CONFIG NO_DEFAULT_PATH)
+add_library(${PROJECT_NAMESPACE}::genicam ALIAS genicam)
+install(TARGETS genicam
+    EXPORT PROJECTTargets
+    COMPONENT bin
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_subdirectory(baumer)
 add_subdirectory(genicam)
-
-link_directories(${GENICAM_LIBRARIES_DIR})
 
 add_subdirectory(rc_genicam_api)
 if (BUILD_TOOLS)
