@@ -52,7 +52,7 @@
 #include <cmath>
 #include <algorithm>
 
-#ifdef WIN32
+#ifdef _WIN32
 #undef min
 #undef max
 #endif
@@ -68,13 +68,17 @@ void printHelp(const char *prgname)
 {
   // show help
 
-  std::cout << prgname << " [-o <output-filename>] [<interface-id>:]<device-id>" << std::endl;
+  std::cout << prgname << " -h | [-o <output-filename>] [<interface-id>:]<device-id>" << std::endl;
   std::cout << std::endl;
-  std::cout << "Gets the first synchronized image set consisting of left, disparity, confidence" << std::endl;
-  std::cout << "and error image, creates a point cloud and stores it in ply ascii format" << std::endl;
-  std::cout << "in the current directory." << std::endl;
+  std::cout << "Gets the first synchronized image set of the Roboception rc_visard, consisting of left, disparity, confidence and error image, creates a point cloud and stores it in ply ascii format." << std::endl;
   std::cout << std::endl;
-  std::cout << "<device-id> Device from which images will taken" << std::endl;
+  std::cout << "Options:" << std::endl;
+  std::cout << "-h        Prints help information and exits" << std::endl;
+  std::cout << "-o <file> Set name of output file (default is 'rc_visard_<timestamp>.ply')" << std::endl;
+  std::cout << std::endl;
+  std::cout << "Parameters:" << std::endl;
+  std::cout << "<interface-id> Optional GenICam ID of interface for connecting to the device" << std::endl;
+  std::cout << "<device-id>    GenICam device ID, serial number or user defined name of device" << std::endl;
 }
 
 /*
@@ -396,6 +400,8 @@ void storePointCloud(std::string name, double f, double t, double scale,
 
 int main(int argc, char *argv[])
 {
+  int ret=0;
+
   try
   {
     // optional parameters
@@ -422,7 +428,7 @@ int main(int argc, char *argv[])
       }
     }
 
-    if (i >= argc)
+    if (i >= argc || std::string(argv[i]) == "-h")
     {
       printHelp(argv[0]);
       return 1;
@@ -649,6 +655,7 @@ int main(int argc, char *argv[])
         if (async >= maxasync && run)
         {
           std::cerr << "Cannot grab synchronized left and disparity image" << std::endl;
+          ret=1;
         }
 
         // stopping and closing image stream
@@ -659,6 +666,7 @@ int main(int argc, char *argv[])
       else
       {
         std::cerr << "No streams available" << std::endl;
+        ret=1;
       }
 
       // closing the communication to the device
@@ -668,22 +676,26 @@ int main(int argc, char *argv[])
     else
     {
       std::cerr << "Device '" << argv[1] << "' not found!" << std::endl;
+      ret=1;
     }
   }
   catch (const std::exception &ex)
   {
     std::cerr << ex.what() << std::endl;
+    ret=2;
   }
   catch (const GENICAM_NAMESPACE::GenericException &ex)
   {
     std::cerr << "Exception: " << ex.what() << std::endl;
+    ret=2;
   }
   catch (...)
   {
     std::cerr << "Unknown exception!" << std::endl;
+    ret=2;
   }
 
   rcg::System::clearSystems();
 
-  return 0;
+  return ret;
 }
