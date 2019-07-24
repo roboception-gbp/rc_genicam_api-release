@@ -1,3 +1,19 @@
+2.2.2 (2019-06-25)
+------------------
+
+- Set TLParamsLocked before requesting maximum buffer size
+- Only free as many buffers as allocated to avoid errors off GenTL producer
+- Request global buffer YPadding only for none multipart buffers to avoid errors of GenTL producer
+
+2.2.1 (2019-06-11)
+------------------
+
+- Automatically splitting the stereo images in rc_visards special combined format into Intenstiy and IntensityRight images
+- Using TLParamsLocked correctly in streaming class as some cameras require this
+- gc_stream now disables component Intensity if IntensityCombined is enabled
+- gc_stream now creates parameter file for each Intensity image as well
+- Increased timeout for updating the device list to 100 ms as 10 ms can be too less for some cameras / producers
+
 2.2.0 (2019-05-02)
 ------------------
 
