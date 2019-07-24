@@ -150,6 +150,16 @@ void Stream::startStreaming(int na)
     stopStreaming();
   }
 
+  // lock parameters before streaming starts
+
+  std::shared_ptr<GenApi::CNodeMapRef> nmap=parent->getRemoteNodeMap();
+  GenApi::IInteger *p=dynamic_cast<GenApi::IInteger *>(nmap->_GetNode("TLParamsLocked"));
+
+  if (GenApi::IsWritable(p))
+  {
+    p->SetValue(1);
+  }
+
   // determine maximum buffer size from transport layer or remote device
 
   size_t size=0;
@@ -232,6 +242,16 @@ void Stream::startStreaming(int na)
       gentl->DSRevokeBuffer(stream, p, 0, 0);
     }
 
+    // unlock parameters
+
+    std::shared_ptr<GenApi::CNodeMapRef> nmap=parent->getRemoteNodeMap();
+    GenApi::IInteger *pi=dynamic_cast<GenApi::IInteger *>(nmap->_GetNode("TLParamsLocked"));
+
+    if (GenApi::IsWritable(pi))
+    {
+      pi->SetValue(0);
+    }
+
     throw GenTLException("Stream::startStreaming()", gentl);
   }
 }
@@ -255,14 +275,27 @@ void Stream::stopStreaming()
 
     // free all buffers
 
-    GenTL::BUFFER_HANDLE p=0;
-    while (gentl->DSGetBufferID(stream, 0, &p) == GenTL::GC_ERR_SUCCESS)
+    for (size_t i=0; i<bn; i++)
     {
-      gentl->DSRevokeBuffer(stream, p, 0, 0);
+      GenTL::BUFFER_HANDLE p=0;
+      if (gentl->DSGetBufferID(stream, 0, &p) == GenTL::GC_ERR_SUCCESS)
+      {
+        gentl->DSRevokeBuffer(stream, p, 0, 0);
+      }
     }
 
     event=0;
     bn=0;
+
+    // unlock parameters
+
+    std::shared_ptr<GenApi::CNodeMapRef> nmap=parent->getRemoteNodeMap();
+    GenApi::IInteger *pi=dynamic_cast<GenApi::IInteger *>(nmap->_GetNode("TLParamsLocked"));
+
+    if (GenApi::IsWritable(pi))
+    {
+      pi->SetValue(0);
+    }
   }
 }
 
