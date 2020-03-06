@@ -1,6 +1,7 @@
 before_script:
   - export DISTRO_CODENAME=`lsb_release -cs` && echo Using distro $DISTRO_CODENAME
-  - apt-get update -yq && apt-get install -y libusb-1.0
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update -yq && apt-get install -y libusb-1.0 libpng-dev
 
 variables:
   GET_SOURCES_ATTEMPTS: 3
@@ -36,6 +37,12 @@ variables:
   image: registry.roboception.de/tools/docker_images:bionic-buildimage
   tags:
     - amd64
+    - docker
+
+.armhf_bionic_t: &armhf_bionic_job
+  image: registry.roboception.de/tools/docker_images:armhf-bionic-buildimage
+  tags:
+    - armhf
     - docker
 
 #############
@@ -98,8 +105,6 @@ gen_dox:
   only:
     - master
     - tags
-  tags:
-    - docs
 
 # Test (on every commit)
 ########################
@@ -113,6 +118,10 @@ test:xenial:armhf:
 
 test:bionic:amd64:
   <<: *amd64_bionic_job
+  extends: .test
+
+test:bionic:armhf:
+  <<: *armhf_bionic_job
   extends: .test
 
 # Deploy testing (only on master)
@@ -129,6 +138,10 @@ package_testing:bionic:amd64:
   <<: *amd64_bionic_job
   extends: .package_testing
 
+package_testing:bionic:armhf:
+  <<: *armhf_bionic_job
+  extends: .package_testing
+
 # Deploy stable (only for releases, version tags)
 #################################################
 package_stable:xenial:amd64:
@@ -141,6 +154,10 @@ package_stable:xenial:armhf:
 
 package_stable:bionic:amd64:
   <<: *amd64_bionic_job
+  extends: .package_stable
+
+package_stable:bionic:armhf:
+  <<: *armhf_bionic_job
   extends: .package_stable
 
 ########################
