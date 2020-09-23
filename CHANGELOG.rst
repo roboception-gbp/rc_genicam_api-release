@@ -1,3 +1,29 @@
+2.4.1 (2020-07-31)
+------------------
+
+- Enabled building for ROS focal on gitlab
+
+2.4.0 (2020-07-27)
+------------------
+
+- gc_stream now puts status of GPIO out and in lines in two separate bit fields in file name
+
+2.3.7 (2020-07-27)
+------------------
+
+- Improved finding devices, e.g. by IP if GenTL provider supports this
+
+2.3.6 (2020-04-17)
+------------------
+
+- Fixed compile bug under Windows
+
+2.3.5 (2020-04-06)
+------------------
+
+- ensure that downscale factor doesn't lead to division by zero
+- remove build_export_depend on catkin from package.xml
+
 2.3.4 (2020-03-15)
 ------------------
 
