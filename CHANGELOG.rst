@@ -1,3 +1,23 @@
+2.4.1 (2020-07-31)
+------------------
+
+- Enabled building for ROS focal on gitlab
+
+2.4.0 (2020-07-27)
+------------------
+
+- gc_stream now puts status of GPIO out and in lines in two separate bit fields in file name
+
+2.3.7 (2020-07-27)
+------------------
+
+- Improved finding devices, e.g. by IP if GenTL provider supports this
+
+2.3.6 (2020-04-17)
+------------------
+
+- Fixed compile bug under Windows
+
 2.3.5 (2020-04-06)
 ------------------
 
