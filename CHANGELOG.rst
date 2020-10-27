@@ -1,3 +1,20 @@
+2.4.4 (2020-10-23)
+------------------
+
+- Trying to fix problem that interface handle becomes invalid
+
+2.4.3 (2020-10-22)
+------------------
+
+- Improved reporting of exceptions
+
+2.4.2 (2020-10-22)
+------------------
+
+- Added some optional Roboception specific information to the parameter files
+- Fixed crashing of gc_info if getting nodemap from device fails
+- Fixed getEnum crash if enum doesn't contain a value
+
 2.4.1 (2020-07-31)
 ------------------
 
