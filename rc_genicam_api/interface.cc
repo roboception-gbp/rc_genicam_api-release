@@ -159,9 +159,30 @@ std::vector<std::shared_ptr<Device> > Interface::getDevices()
 
     // update available interfaces
 
-    if (gentl->IFUpdateDeviceList(ifh, 0, 100) != GenTL::GC_ERR_SUCCESS)
+    GenTL::GC_ERROR err=gentl->IFUpdateDeviceList(ifh, 0, 100);
+
+    if (err == GenTL::GC_ERR_INVALID_HANDLE)
     {
-      throw GenTLException("Interface::getDevices()", gentl);
+      // the interface handle is invalid, try to reopen the interface
+
+      if (gentl->TLUpdateInterfaceList(parent->getHandle(), 0, 10) != GenTL::GC_ERR_SUCCESS)
+      {
+        throw GenTLException(std::string("Interface::getDevices() (recovery 1) ")+id, gentl);
+      }
+
+      if (gentl->TLOpenInterface(parent->getHandle(), id.c_str(), &ifh) != GenTL::GC_ERR_SUCCESS)
+      {
+        throw GenTLException(std::string("Interface::getDevices() (recovery 2) ")+id, gentl);
+      }
+
+      // try to repeat discovery of devices
+
+      err=gentl->IFUpdateDeviceList(ifh, 0, 100);
+    }
+
+    if (err != GenTL::GC_ERR_SUCCESS)
+    {
+      throw GenTLException(std::string("Interface::getDevices() (1) ")+id+" "+std::to_string(err), gentl);
     }
 
     // create list of interfaces, using either existing interfaces or
@@ -170,7 +191,7 @@ std::vector<std::shared_ptr<Device> > Interface::getDevices()
     uint32_t n=0;
     if (gentl->IFGetNumDevices(ifh, &n) != GenTL::GC_ERR_SUCCESS)
     {
-      throw GenTLException("Interface::getDevices()", gentl);
+      throw GenTLException(std::string("Interface::getDevices() (2) ")+id, gentl);
     }
 
     for (uint32_t i=0; i<n; i++)
@@ -180,7 +201,7 @@ std::vector<std::shared_ptr<Device> > Interface::getDevices()
 
       if (gentl->IFGetDeviceID(ifh, i, tmp, &size) != GenTL::GC_ERR_SUCCESS)
       {
-        throw GenTLException("Interface::getDevices()", gentl);
+        throw GenTLException(std::string("Interface::getDevices() (3) ")+id, gentl);
       }
 
       int k=find(current, tmp);
