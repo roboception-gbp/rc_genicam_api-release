@@ -51,8 +51,8 @@ namespace GENAPI_NAMESPACE
     // INodePrivate interface
     //*************************************************************
 
-    interface INodePrivate;
-    interface INodeMapPrivate;
+    GENICAM_INTERFACE INodePrivate;
+    GENICAM_INTERFACE INodeMapPrivate;
 
     //! a vector of node references using the INodePrivate interface
     typedef std::vector< INodePrivate* > NodePrivateVector_t;
@@ -61,7 +61,7 @@ namespace GENAPI_NAMESPACE
     \brief Interface including the methods for node construction common to all nodes
     \ingroup GenApi_PublicImpl
     */
-    interface GENAPI_DECL_ABSTRACT INodePrivate : public INode
+    GENICAM_INTERFACE GENAPI_DECL_ABSTRACT INodePrivate : public INode
     {
         /**** Methods to create nodes ****/
 
@@ -91,7 +91,9 @@ namespace GENAPI_NAMESPACE
         enum ESetInvalidMode
         {
             simOnlyMe,  //!< Invalidate only the node itself
-            simAll  //!< Invalidate the node and all of its dependents
+            simAll,  //!< Invalidate the node and all of its dependents
+            simDependentsAfterWrite, // !< Invalidate all of its dependents but not itself after a write of a terninal node
+            simDependents // !< Invalidate all of its dependents but not itself
         };
 
         //! Invalidate the node resp. the node and all of its dependents

@@ -18,85 +18,87 @@ set(GENICAM_LIB_SUFFIX)
 
 if ("${ARCHITECTURE}" STREQUAL "arm")
   set(GENICAM_LIBRARIES
-    libGCBase_gcc46_v3_1
-    libMathParser_gcc46_v3_1
-    libGenApi_gcc46_v3_1
-    libNodeMapData_gcc46_v3_1
-    liblog4cpp_gcc46_v3_1
-    libXmlParser_gcc46_v3_1
-    libLog_gcc46_v3_1
+    libGCBase_gcc494_v3_3
+    libGenApi_gcc494_v3_3
+    liblog4cpp_gcc494_v3_3
+    libLog_gcc494_v3_3
+    libMathParser_gcc494_v3_3
+    libNodeMapData_gcc494_v3_3
+    libXmlParser_gcc494_v3_3
   )
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bin/Linux32_ARMhf)
   set(GENICAM_LIB_SUFFIX ".so")
 elseif ("${ARCHITECTURE}" STREQUAL "aarch64")
   set(GENICAM_LIBRARIES
-    libGCBase_gcc48_v3_1
-    libMathParser_gcc48_v3_1
-    libGenApi_gcc48_v3_1
-    libNodeMapData_gcc48_v3_1
-    liblog4cpp_gcc48_v3_1
-    libXmlParser_gcc48_v3_1
-    libLog_gcc48_v3_1
+    libGCBase_gcc49_v3_3
+    libGenApi_gcc49_v3_3
+    liblog4cpp_gcc49_v3_3
+    libLog_gcc49_v3_3
+    libMathParser_gcc49_v3_3
+    libNodeMapData_gcc49_v3_3
+    libXmlParser_gcc49_v3_3
   )
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bin/Linux64_ARM)
   set(GENICAM_LIB_SUFFIX ".so")
 elseif ("${ARCHITECTURE}" STREQUAL "i686")
   set(GENICAM_LIBRARIES
-    libGCBase_gcc42_v3_1
-    libMathParser_gcc42_v3_1
-    libGenApi_gcc42_v3_1
-    libNodeMapData_gcc42_v3_1
-    liblog4cpp_gcc42_v3_1
-    libXmlParser_gcc42_v3_1
-    libLog_gcc42_v3_1
+    libGCBase_gcc48_v3_3
+    libGenApi_gcc48_v3_3
+    liblog4cpp_gcc48_v3_3
+    libLog_gcc48_v3_3
+    libMathParser_gcc48_v3_3
+    libNodeMapData_gcc48_v3_3
+    libXmlParser_gcc48_v3_3
   )
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bin/Linux32_i86)
   set(GENICAM_LIB_SUFFIX ".so")
 elseif ("${ARCHITECTURE}" STREQUAL "x86_64")
   set(GENICAM_LIBRARIES
-    libGCBase_gcc42_v3_1
-    libMathParser_gcc42_v3_1
-    libGenApi_gcc42_v3_1
-    libNodeMapData_gcc42_v3_1
-    liblog4cpp_gcc42_v3_1
-    libXmlParser_gcc42_v3_1
-    libLog_gcc42_v3_1
+    libGCBase_gcc48_v3_3
+    libGenApi_gcc48_v3_3
+    liblog4cpp_gcc48_v3_3
+    libLog_gcc48_v3_3
+    libMathParser_gcc48_v3_3
+    libNodeMapData_gcc48_v3_3
+    libXmlParser_gcc48_v3_3
   )
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bin/Linux64_x64)
   set(GENICAM_LIB_SUFFIX ".so")
 elseif ("${ARCHITECTURE}" STREQUAL "WIN32_i86")
   install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/GCBase_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/GenApi_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/Log_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/MathParser_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/msvcp120.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/msvcr120.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/NodeMapData_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/XmlParser_MD_VC120_v3_1.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/GCBase_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/GenApi_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/log4cpp_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/Log_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/MathParser_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/msvcp140.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/vcruntime140.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/NodeMapData_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/XmlParser_MD_VC141_v3_3.dll
 	COMPONENT bin DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
   set(GENICAM_LIBRARIES
-    GCBase_MD_VC120_v3_1
-    GenApi_MD_VC120_v3_1
+    GCBase_MD_VC141_v3_3
+    GenApi_MD_VC141_v3_3
   )
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/library/CPP/lib/Win32_i86)
   set(GENICAM_LIB_SUFFIX ".lib")
 elseif ("${ARCHITECTURE}" STREQUAL "WIN64_x64")
   install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/GCBase_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/GenApi_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/Log_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/MathParser_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/msvcp120.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/msvcr120.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/NodeMapData_MD_VC120_v3_1.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/XmlParser_MD_VC120_v3_1.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/GCBase_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/GenApi_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/log4cpp_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/Log_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/MathParser_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/msvcp140.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/vcruntime140.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/NodeMapData_MD_VC141_v3_3.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/XmlParser_MD_VC141_v3_3.dll
 	COMPONENT bin DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
   set(GENICAM_LIBRARIES
-    GCBase_MD_VC120_v3_1
-    GenApi_MD_VC120_v3_1
+    GCBase_MD_VC141_v3_3
+    GenApi_MD_VC141_v3_3
   )
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/library/CPP/lib/Win64_x64)
   set(GENICAM_LIB_SUFFIX ".lib")

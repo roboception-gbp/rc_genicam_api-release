@@ -9,51 +9,31 @@ The API is based on C++ 11 and can be compiled under Linux and Windows.
 
 This package also provides some tools that can be called from the command line
 for discovering cameras, changing their configuration and streaming images.
-Although the tools are meant to be useful when working in a shell or in a
-script, their main purpose is to serve as example on how to use the API for
-reading and setting parameters, streaming and synchronizing images.
 
-API changes in version 2.0.0
-----------------------------
+Contents
+--------
 
-Version 2.0.0 introduced some API changes that require minor changes of
-programs that use the classes Buffer, Image and ImageList.
+- [Minimum Requirements](#minimum-requirements)
+- [Compiling and Installing](#compiling-and-installing)
+  - [Linux](#linux)
+  - [Windows](#windows-and-visual-studio)
+- [Description of Tools](#description-of-tools)
+  - [gc_info](#gc_info)
+  - [gc_config](#gc_config)
+  - [gc_stream](#gc_stream)
+  - [gc_pointcloud](#gc_pointcloud)
+  - [gc_file](#gc_file)
+- [Definition of Device ID](#definition-of-device-id)
+- [Finding the Transport Layer](#finding-the-transport-layer)
+- [Network Optimization under Linux](#network-optimization-under-linux)
 
-An object of class Buffer can now represents a single buffer as well as a
-multipart buffer, depending on the availability of multipart support in the
-used GenTL producer and the GigE vision device. Multipart buffers can contain
-more than one image. For simplicity of the interface, non-multipart buffers are
-now treated like multipart buffers with just one image.
+Minimum Requirements
+--------------------
 
-For writing code that is able to support multipart, after grabbing the buffer,
-the number of parts must be requested with the method
-Buffer::getNumberOfParts() and a loop must be added to cycle over all parts.
-All methods that access image specific data have been extended by a second
-parameter for providing the 0 based part index. The following existing
-methods have been changed:
-
-- void    *Buffer::getBase(std::uint32_t part) const;
-- size_t   Buffer::getSize(std::uint32_t part) const;
-- size_t   Buffer::getWidth(std::uint32_t part) const;
-- size_t   Buffer::getHeight(std::uint32_t part) const;
-- size_t   Buffer::getXOffset(std::uint32_t part) const;
-- size_t   Buffer::getYOffset(std::uint32_t part) const;
-- size_t   Buffer::getXPadding(std::uint32_t part) const;
-- bool     Buffer::getImagePresent(std::uint32_t part) const;
-- uint64_t Buffer::getPixelFormat(std::uint32_t part) const;
-- uint64_t Buffer::getPixelFormatNamespace(std::uint32_t part) const;
-- size_t   Buffer::getDeliveredImageHeight(std::uint32_t part) const;
--          Image::Image(const Buffer *buffer, std::uint32_t part);
-- void     ImageList::add(const Buffer *buffer, size_t part);
-
-Another important change is to use the new method Buffer::getGlobalBase() for
-getting the address used to connect a buffer with the nodemap for accessing
-chunk parameters instead of Buffer::getBase(). Other, new methods include:
-
-- void    *Buffer::getGlobalBase() const;
-- size_t   Buffer::getGlobalSize() const;
-- size_t   Buffer::getPartDataType(uint32_t part) const;
-- uint64_t Buffer::getPartSourceID(std::uint32_t part) const;
+- Linux x64 / i86: gcc >= 4.8
+- ARMhf: gcc >= 4.9.4
+- Linux AArch64: gcc >= 5.4
+- Windows 10: Visual Studio >= VC140
 
 Compiling and Installing
 ------------------------
@@ -119,8 +99,8 @@ NOTE: For using the libraries in own projects, define the symbol
 `GENICAM_NO_AUTO_IMPLIB` in your project file to avoid linker problems with the
 GenICam libraries.
 
-Tools
------
+Description of Tools
+--------------------
 
 The tools do not offer a graphical user interface. They are meant to be called
 from a shell (e.g. Power Shell under Windows) or script and controlled by
@@ -142,7 +122,7 @@ gc_info -h | -l | ([-o <xml-output-file>] [<interface-id>:]<device-id>[?<node>] 
 
 Provides information about GenICam transport layers, interfaces and devices.
 
-Options: 
+Options:
 -h   Prints help information and exits
 -l   List all all available devices on all interfaces
 -o   Filename to store XML description from specified device
@@ -199,8 +179,8 @@ images:
 gc_stream <ID> ComponentSelector=Intensity ComponentEnable=1 ComponentSelector=Disparity ComponentEnable=0 n=10
 ```
 
-NOTE: Many image viewers can display PGM and PPM format. The sv tool of cvkit
-(https://github.com/roboception/cvkit) can also be used.
+NOTE: Many image viewers can display PGM and PPM format. The sv tool of
+[cvkit](https://github.com/roboception/cvkit) can also be used.
 
 ```
 gc_stream -h | [-f <fmt>] [-t] [<interface-id>:]<device-id> [n=<n>] [<key>=<value>] ...
@@ -228,7 +208,7 @@ This tool demonstrates how to synchronize different images according to
 their timestamps.
 
 NOTE: PLY is a standard format for scanned 3D data that can be read by many
-programs. The plyv tool of cvkit (https://github.com/roboception/cvkit) can
+programs. The plyv tool of [cvkit](https://github.com/roboception/cvkit) can
 also be used for visualization.
 
 ```
@@ -247,8 +227,26 @@ Parameters:
 <device-id>    GenICam device ID, serial number or user defined name of device
 ```
 
-Device ID
----------
+### gc_file
+
+This tool can be used to upload and download a file into the persistent user
+space of an industrial camera.
+
+```
+tools/gc_file -h | [<interface-id>:]<device-id> -f | (<device-file> [-w|-r <file>])
+
+Downloading or uploading a file via GenICam.
+
+-h            Prints help information and exits
+-f            Lists names of files on the device
+-w <file>     Writes the given local file into the selected file on the device
+-r <file>     Reads the selected file on the device and stores it as local file
+
+The selected file is printed on std out if none of -f, -w and -r are given.
+```
+
+Definition of Device ID
+-----------------------
 
 There are multiple ways of specifying an ID to identify a device.
 
@@ -293,8 +291,8 @@ which triggers looking on all interfaces.
 If the given ID does not contain a colon, the ID is interpreted as the
 device ID itself and is sought throughout all interfaces as well.
 
-Transport Layer
----------------
+Finding the Transport Layer
+---------------------------
 
 The communication to the device is done through a so called transport layer
 (i.e. GenTL producer version 1.5 or higher). This package provides and installs
