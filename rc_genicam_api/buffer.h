@@ -36,6 +36,9 @@
 #ifndef RC_GENICAM_API_BUFFER
 #define RC_GENICAM_API_BUFFER
 
+#include <GenApi/GenApi.h>
+#include <GenApi/ChunkAdapter.h>
+
 #include <memory>
 #include <string>
 
@@ -122,6 +125,16 @@ class Buffer
     */
 
     Buffer(const std::shared_ptr<const GenTLWrapper> &gentl, Stream *parent);
+    ~Buffer();
+
+    /**
+      Set the device nodemap. If chunks are enabled (i.e. ChunkModeActive is
+      true), the the buffer is automatically attached every time when
+      setHandle() is called in Stream::grab(). This means that chunk values of
+      the last grabbed buffer can be directly accessed through the nodemap.
+    */
+
+    void setNodemap(const std::shared_ptr<GenApi::CNodeMapRef> nodemap, const std::string &tltype);
 
     /**
       Set the buffer handle that this object should manage. The handle is used
@@ -460,7 +473,11 @@ class Buffer
     Stream *parent;
     std::shared_ptr<const GenTLWrapper> gentl;
     void *buffer;
+    size_t payload_type;
     bool multipart;
+
+    std::shared_ptr<GenApi::CNodeMapRef> nodemap;
+    std::shared_ptr<GenApi::CChunkAdapter> chunkadapter;
 };
 
 bool isHostBigEndian();

@@ -38,6 +38,7 @@
 #include "Port.h"
 #include "PrivateTypes.h"
 #include "Node.h"
+#include "NodeMap.h"
 #include "../IInteger.h"
 #include "../IEnumeration.h"
 
@@ -111,7 +112,7 @@ namespace GENAPI_NAMESPACE
         virtual void InternalGet(uint8_t *ppBuffer, int64_t pLength, bool Verify = false, bool IgnoreCache = false) ;
 
         //! Retrieves the Length of the register [Bytes]
-        virtual int64_t InternalGetLength();
+        virtual int64_t InternalGetLength(bool Verify);
 
         //! Retrieves the Address of the register
         virtual int64_t InternalGetAddress(bool Verify, bool IgnoreCache);

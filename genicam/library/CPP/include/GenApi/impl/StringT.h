@@ -67,12 +67,11 @@ namespace GENAPI_NAMESPACE
 
                     Base::InternalSetValue(Value, Verify);
 
-                    if( Verify )
-                        Base::InternalCheckError();
-
                     // now Base::PostSetValue is called by ~PostSetValueFinalizer, i.e. updates are fired
                     // if this is the call on the top of a chain of SetValue calls
                 }
+                if (Verify)
+                    Base::InternalCheckError();
 
                 GCLOGINFOPOP( Base::m_pValueLog, "...SetValue" );
 
@@ -135,16 +134,16 @@ namespace GENAPI_NAMESPACE
         }
 
         //! Retrieves the maximum length of the string in bytes
-        virtual int64_t GetMaxLength()
+        virtual int64_t GetMaxLength( bool Verify = false )
         {
             AutoLock l(Base::GetLock());
 
             GCLOGINFOPUSH( Base::m_pRangeLog, "GetMaxLength...");
 
             int64_t MaxLength = IsWritable( this ) ?
-                Base::InternalGetMaxLength() 
+                Base::InternalGetMaxLength( Verify )
                 :
-                Base::InternalGetValue().size();
+                Base::InternalGetValue( Verify ).size();
 
             GCLOGINFOPOP( Base::m_pRangeLog, "...GetMaxLength = %" FMT_I64 "d", MaxLength );
 
