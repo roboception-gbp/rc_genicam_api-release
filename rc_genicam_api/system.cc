@@ -65,8 +65,10 @@ System::~System()
 namespace
 {
 
-std::mutex system_mtx;
-std::vector<std::shared_ptr<System> > slist;
+std::recursive_mutex system_mtx;
+std::vector<std::shared_ptr<System> > system_list;
+std::string system_path;
+std::string system_ignore;
 
 int find(const std::vector<std::shared_ptr<System> > &list, const std::string &filename)
 {
@@ -113,74 +115,132 @@ static std::string getPathToThisDll()
 
 }
 
+bool System::setSystemsPath(const char *path, const char *ignore)
+{
+  std::lock_guard<std::recursive_mutex> lock(system_mtx);
+
+  if (system_path.size() == 0)
+  {
+    if (path == 0 || path[0] == '\0')
+    {
+#ifdef _WIN32
+      // under Windows, use the path to the current executable as fallback
+
+      const size_t n=256;
+      char procpath[n];
+      std::string path_to_exe;
+      if (GetModuleFileName(NULL, procpath, n-1) > 0)
+      {
+        procpath[n-1]='\0';
+
+        char *p=strrchr(procpath, '\\');
+        if (p != 0) *p='\0';
+
+        path_to_exe=procpath;
+		
+		if (system_path.size() > 0) system_path+=";";
+		
+        system_path += path_to_exe;
+      }
+
+      // another fallback is the path to the current library
+
+      const auto path_to_this_dll = getPathToThisDll();
+      if (!path_to_this_dll.empty() && path_to_this_dll != path_to_exe)
+      {
+		if (system_path.size() > 0) system_path+=";";
+		
+        system_path += path_to_this_dll;
+      }
+	  
+	  // and possible sub-directories of the library
+	  
+	  HANDLE file_handle;
+	  WIN32_FIND_DATA file_info;
+	  
+	  file_handle=FindFirstFileA((path_to_this_dll+"\\*").c_str(), &file_info);
+	  if (file_handle != INVALID_HANDLE_VALUE)
+	  {
+		do
+		{
+  		  if ((file_info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && file_info.cFileName[0] != '.' )
+		  {
+			system_path += ";" + path_to_this_dll + "\\" + file_info.cFileName;
+		  }
+		}
+		while (FindNextFileA(file_handle, &file_info));
+		
+		FindClose(file_handle);
+	  }
+#else
+      // otherwise, use the absolute install path to the default transport layer
+
+      system_path=GENTL_INSTALL_PATH;
+#endif
+    }
+    else
+    {
+      system_path=path;
+    }
+
+    if (ignore != 0)
+    {
+      system_ignore=ignore;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 std::vector<std::shared_ptr<System> > System::getSystems()
 {
-  std::lock_guard<std::mutex> lock(system_mtx);
+  std::lock_guard<std::recursive_mutex> lock(system_mtx);
   std::vector<std::shared_ptr<System> > ret;
+
+  // ensure that system_path is defined
+
+  if (system_path.size() == 0)
+  {
+    const char *env=0;
+    if (sizeof(size_t) == 8)
+    {
+      env="GENICAM_GENTL64_PATH";
+    }
+    else
+    {
+      env="GENICAM_GENTL32_PATH";
+    }
+
+    setSystemsPath(std::getenv(env), 0);
+  }
 
   // get list of all available transport layer libraries
 
-  const char *env=0;
-  if (sizeof(size_t) == 8)
-  {
-    env="GENICAM_GENTL64_PATH";
-  }
-  else
-  {
-    env="GENICAM_GENTL32_PATH";
-  }
-
-  std::string path;
-
-  const char *envpath=std::getenv(env);
-  if (envpath != 0)
-  {
-    path=envpath;
-  }
-
-  if (path.size() == 0)
-  {
-#ifdef _WIN32
-    // under Windows, use the path to the current executable as fallback
-
-    const size_t n=256;
-    char procpath[n];
-    std::string path_to_exe;
-    if (GetModuleFileName(NULL, procpath, n-1) > 0)
-    {
-      procpath[n-1]='\0';
-
-      char *p=strrchr(procpath, '\\');
-      if (p != 0) *p='\0';
-
-      path_to_exe=procpath;
-      path+=";" + path_to_exe;
-    }
-
-    const auto path_to_this_dll = getPathToThisDll();
-    if (!path_to_this_dll.empty() && path_to_this_dll != path_to_exe)
-    {
-      path += ";" + path_to_this_dll;
-    }
-#else
-    // otherwise, use the absolute install path to the default transport layer
-
-    path=GENTL_INSTALL_PATH;
-#endif
-  }
-
-  std::vector<std::string> name=getAvailableGenTLs(path.c_str());
+  std::vector<std::string> name=getAvailableGenTLs(system_path.c_str());
 
   // create list of systems according to the list, using either existing
   // systems or instantiating new ones
 
   for (size_t i=0; i<name.size(); i++)
   {
-    int k=find(slist, name[i]);
+    int k=find(system_list, name[i]);
+
+    if (system_ignore.size() > 0)
+    {
+      // skipping if name equals ignore
+
+      if (name[i].size() >= system_ignore.size() &&
+          name[i].substr(name[i].size()-system_ignore.size()) == system_ignore)
+      {
+        continue;
+      }
+    }
 
     if (k >= 0)
     {
-      ret.push_back(slist[static_cast<size_t>(k)]);
+      ret.push_back(system_list[static_cast<size_t>(k)]);
     }
     else
     {
@@ -198,13 +258,13 @@ std::vector<std::shared_ptr<System> > System::getSystems()
 
   // remember returned list for reusing existing systems on the next call
 
-  slist=ret;
+  system_list=ret;
 
   // throw exception if no transport layers are available
 
   if (ret.size() == 0)
   {
-    throw GenTLException(std::string("No transport layers found in path ")+path);
+    throw GenTLException(std::string("No transport layers found in path ")+system_path);
   }
 
   return ret;
@@ -212,15 +272,15 @@ std::vector<std::shared_ptr<System> > System::getSystems()
 
 void System::clearSystems()
 {
-  std::lock_guard<std::mutex> lock(system_mtx);
+  std::lock_guard<std::recursive_mutex> lock(system_mtx);
 
   // clear all interfaces explicitly as part of ENUM-WORKAROUND
-  for (size_t i=0; i<slist.size(); i++)
+  for (size_t i=0; i<system_list.size(); i++)
   {
-    slist[i]->clearInterfaces();
+    system_list[i]->clearInterfaces();
   }
 
-  slist.clear();
+  system_list.clear();
 }
 
 const std::string &System::getFilename() const

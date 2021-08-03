@@ -87,7 +87,11 @@ void CPort::Write(const void *buffer, int64_t addr, int64_t length)
     if (gentl->GCWritePort(*port, static_cast<uint64_t>(addr), buffer, &size) !=
         GenTL::GC_ERR_SUCCESS)
     {
-      throw GenTLException("CPort::Write()", gentl);
+      std::ostringstream out;
+      out << "CPort::Write(address=0x" << std::hex << addr << ", length=" <<
+        std::dec << length << ")";
+
+      throw GenTLException(out.str(), gentl);
     }
 
     if (size != static_cast<size_t>(length))
@@ -200,6 +204,11 @@ std::shared_ptr<GenApi::CNodeMapRef> allocNodeMap(std::shared_ptr<const GenTLWra
 
       if (xml != 0)
       {
+        if (xml[0] == '\0')
+        {
+          xml=name.c_str();
+        }
+
         std::ofstream out(xml, std::ios::binary);
 
         out.rdbuf()->sputn(buffer.get(), static_cast<std::streamsize>(length));
