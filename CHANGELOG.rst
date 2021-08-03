@@ -1,3 +1,51 @@
+2.5.6 (2021-08-02)
+------------------
+
+- Changed ImageList::find with tolerance > 0 to return the closest within tolerance
+
+2.5.5 (2021-07-28)
+------------------
+
+- Fixed rounding when converting between color and monochrome images
+- Reduce minimum number of buffers
+- Do not attach chunk data handler to incomplete buffer
+
+2.5.4 (2021-07-25)
+------------------
+
+- Fixed reporting of operation status of gc_file tool
+
+2.5.3 (2021-07-17)
+------------------
+
+- Added build script for Visual Studio
+- Added methods for getting region id and data purpose id from buffer
+- On Windows, also try to find producers in sub directories of current library
+- Fixed some compiler warnings
+- Improved error message when writing on cport fails
+- Fixed conversion from YCbCr411 format to Mono8 in convertImage() function
+- Improved error message when setting invalid enum
+- Added support for RGB8 color format in getColor() function
+
+2.5.2 (2021-07-06)
+------------------
+
+- Added possibility for configuration of multiple Gev interfaces in gc_config
+- Fixed printing of Mac address in gc_info
+- Added method to stream object for checking the number of buffers available for grabbing
+- Treating missing parameters in Buffer as 0
+- Changed way how to define different path for locating producers
+- Added possibility to discover producers in non-default locations and ignoring a specific producer
+- Added possibility to store xml file with gc_info with original name
+
+2.5.1 (2021-03-16)
+------------------
+
+- Fixed compile problems under Windows
+- Fixed using wrong pointer in method Stream::getTLType()
+- Readme: Add link to release page
+- Removing redundent specification of namespace in some source files
+
 2.5.0 (2021-02-26)
 ------------------
 
