@@ -62,16 +62,41 @@ class System : public std::enable_shared_from_this<System>
     ~System();
 
     /**
-      Returns a list of systems (i.e. transport layers) that is currently
-      available. For discovering available transport layers, the environment
-      variable GENICAM_GENTL32_PATH or GENICAM_GENTL64_PATH (depending on the
-      compilation with 32 or 64 bit) is used. In case the environment variable
-      is not set or is empty, a default path is used, which points to the
-      GenTL layer that is bundled with rc_genicam_api.
+      Set the path for finding GenTL producers on the file system and the name
+      of a producer that should be ignored.
+
+      NODE: This function must be called before the first call to getSystems().
+      It can only be called once.
+
+      If this function is not called before calling getSystems() for the first
+      time, then the path is taken from the environment variable
+      GENICAM_GENTL32_PATH or GENICAM_GENTL64_PATH (depending on the
+      compilation with 32 or 64 bit). If that variable is empty or not defined,
+      then the install directory of the GenTL producers that are included in
+      the rc_genicam_api are used.
+
+      @param path   List of GenTL producers with absolute path or directories
+                    with producers (i.e. with suffix .cti). The files or
+                    directories are separated by ';' under Windows or ':' under
+                    Linux. The parameter can be 0 or "" for using the install
+                    directory of the GenTL producers that are included in the
+                    rc_genicam_api.
+      @param ignore Name of producer (i.e. file name without path) that is
+                    ignored. This parameter can be 0.
+      @return       False if either setSystemsPath() or setSystems() was called
+                    before.
+    */
+
+    static bool setSystemsPath(const char *path, const char *ignore);
+
+
+    /**
+      This function creates systems for all producers that can be found. See
+      also setSystemPath() for and explanation where the producers are sought.
 
       NOTE: This is the only method that can instantiate System objects.
 
-      @return List of all available transport layers.
+      @return List of available systems.
     */
 
     static std::vector<std::shared_ptr<System> > getSystems();
