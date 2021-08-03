@@ -308,7 +308,14 @@ bool setEnum(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const char *na
 
         if (val != 0)
         {
-          GenApi::IEnumEntry *entry=val->GetEntryByName(value);
+          GenApi::IEnumEntry *entry=0;
+
+          try
+          {
+            entry=val->GetEntryByName(value);
+          }
+          catch (const GENICAM_NAMESPACE::GenericException &)
+          { }
 
           if (entry != 0)
           {
@@ -378,7 +385,7 @@ bool setString(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const char *
               }
               else
               {
-                p->SetValue(std::stoi(v));
+                p->SetValue(static_cast<bool>(std::stoi(v)));
               }
             }
             break;
@@ -444,7 +451,14 @@ bool setString(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const char *
           case GenApi::intfIEnumeration:
             {
               GenApi::IEnumeration *p=dynamic_cast<GenApi::IEnumeration *>(node);
-              GenApi::IEnumEntry *entry=p->GetEntryByName(value);
+              GenApi::IEnumEntry *entry=0;
+
+              try
+              {
+                entry=p->GetEntryByName(value);
+              }
+              catch (const GENICAM_NAMESPACE::GenericException &)
+              { }
 
               if (entry != 0)
               {
@@ -878,7 +892,7 @@ std::string getString(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const
 void checkFeature(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap, const char *name,
                   const char *value, bool igncache)
 {
-  std::string cvalue=rcg::getString(nodemap, name, true, igncache);
+  std::string cvalue=getString(nodemap, name, true, igncache);
 
   if (cvalue != "" && cvalue != value)
   {
@@ -913,7 +927,7 @@ std::shared_ptr<GenApi::CChunkAdapter> getChunkAdapter(const std::shared_ptr<Gen
 }
 
 std::string getComponetOfPart(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap,
-                              const rcg::Buffer *buffer, uint32_t ipart)
+                              const Buffer *buffer, uint32_t ipart)
 {
   std::string component;
 
