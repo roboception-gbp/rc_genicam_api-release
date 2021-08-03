@@ -100,9 +100,10 @@ void convYCbCr411toRGB(uint8_t rgb[3], const uint8_t *row, int i)
   const int Cb=static_cast<int>(row[j+2])-128;
   const int Cr=static_cast<int>(row[j+5])-128;
 
-  const int rc=(90*Cr+32)>>6;
-  const int gc=(-22*Cb-46*Cr+32)>>6;
-  const int bc=(113*Cb+32)>>6;
+  // conversion of YCbCr into RGB with correct rounding
+  const int rc=((90*Cr+16384+32)>>6)-256;
+  const int gc=((-22*Cb-46*Cr+16384+32)>>6)-256;
+  const int bc=((113*Cb+16384+32)>>6)-256;
 
   rgb[0]=clamp8(Y+rc);
   rgb[1]=clamp8(Y+gc);
@@ -117,9 +118,10 @@ void convYCbCr411toQuadRGB(uint8_t rgb[12], const uint8_t *row, int i)
   const int Cb=static_cast<int>(row[i+2])-128;
   const int Cr=static_cast<int>(row[i+5])-128;
 
-  const int rc=(90*Cr+32)>>6;
-  const int gc=(-22*Cb-46*Cr+32)>>6;
-  const int bc=(113*Cb+32)>>6;
+  // conversion of YCbCr into RGB with correct rounding
+  const int rc=((90*Cr+16384+32)>>6)-256;
+  const int gc=((-22*Cb-46*Cr+16384+32)>>6)-256;
+  const int bc=((113*Cb+16384+32)>>6)-256;
 
   for (int j=0; j<4; j++)
   {
@@ -129,7 +131,7 @@ void convYCbCr411toQuadRGB(uint8_t rgb[12], const uint8_t *row, int i)
   }
 }
 
-void getColor(uint8_t rgb[3], const std::shared_ptr<const rcg::Image> &img,
+void getColor(uint8_t rgb[3], const std::shared_ptr<const Image> &img,
               uint32_t ds, uint32_t i, uint32_t k)
 {
   if (ds < 1)
@@ -158,6 +160,34 @@ void getColor(uint8_t rgb[3], const std::shared_ptr<const rcg::Image> &img,
 
     rgb[2]=rgb[1]=rgb[0]=static_cast<uint8_t>(g/n);
   }
+  else if (img->getPixelFormat() == RGB8) // convert from RGB8
+  {
+    size_t lstep=3*img->getWidth()+img->getXPadding();
+    const uint8_t *p=img->getPixels()+k*lstep+3*i;
+
+    uint32_t r=0;
+    uint32_t g=0;
+    uint32_t b=0;
+    uint32_t n=0;
+
+    for (uint32_t kk=0; kk<ds; kk++)
+    {
+      const uint8_t *pp=p;
+      for (uint32_t ii=0; ii<ds; ii++)
+      {
+        r+=*pp++;
+        g+=*pp++;
+        b+=*pp++;
+        n++;
+      }
+
+      p+=lstep;
+    }
+
+    rgb[0]=static_cast<uint8_t>(r/n);
+    rgb[1]=static_cast<uint8_t>(g/n);
+    rgb[2]=static_cast<uint8_t>(b/n);
+  }
   else if (img->getPixelFormat() == YCbCr411_8) // convert from YUV
   {
     size_t lstep=(img->getWidth()>>2)*6+img->getXPadding();
@@ -173,7 +203,7 @@ void getColor(uint8_t rgb[3], const std::shared_ptr<const rcg::Image> &img,
       for (uint32_t ii=0; ii<ds; ii++)
       {
         uint8_t v[3];
-        rcg::convYCbCr411toRGB(v, p, static_cast<int>(i+ii));
+        convYCbCr411toRGB(v, p, static_cast<int>(i+ii));
 
         r+=v[0];
         g+=v[1];
@@ -257,7 +287,7 @@ inline uint8_t rgb2Grey(uint8_t r, uint8_t g, uint8_t b)
 {
   return static_cast<uint8_t>((9798*static_cast<uint32_t>(r)+
                                19234*static_cast<uint32_t>(g)+
-                               3736*static_cast<uint32_t>(b))/32768);
+                               3736*static_cast<uint32_t>(b)+16384)>>15);
 }
 
 inline void storeRGBMono(uint8_t *&rgb_out, uint8_t *&mono_out, uint8_t red, uint8_t green,
@@ -415,7 +445,7 @@ bool convertImage(uint8_t *rgb_out, uint8_t *mono_out, const uint8_t *raw, uint6
             if (rgb_out)
             {
               uint8_t rgb[12];
-              rcg::convYCbCr411toQuadRGB(rgb, raw, static_cast<int>(i));
+              convYCbCr411toQuadRGB(rgb, raw, static_cast<int>(i));
 
               for (int j=0; j<12; j++)
               {
@@ -425,10 +455,11 @@ bool convertImage(uint8_t *rgb_out, uint8_t *mono_out, const uint8_t *raw, uint6
 
             if (mono_out)
             {
-              *mono_out++ = raw[0];
-              *mono_out++ = raw[1];
-              *mono_out++ = raw[3];
-              *mono_out++ = raw[4];
+              size_t j=(i>>2)*6;
+              *mono_out++ = raw[j];
+              *mono_out++ = raw[j+1];
+              *mono_out++ = raw[j+3];
+              *mono_out++ = raw[j+4];
             }
           }
 

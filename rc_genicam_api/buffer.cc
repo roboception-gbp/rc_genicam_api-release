@@ -60,7 +60,10 @@ template<class T> inline T getBufferValue(const std::shared_ptr<const GenTLWrapp
 
   if (stream != 0 && buffer != 0)
   {
-    gentl->DSGetBufferInfo(stream, buffer, cmd, &type, &ret, &size);
+    if (gentl->DSGetBufferInfo(stream, buffer, cmd, &type, &ret, &size) != GenTL::GC_ERR_SUCCESS)
+    {
+      ret=0;
+    }
   }
 
   return ret;
@@ -180,7 +183,8 @@ void Buffer::setHandle(void *handle)
     multipart=getBufferValue<size_t>(gentl, parent->getHandle(), buffer,
                                      GenTL::BUFFER_INFO_PAYLOADTYPE) == PAYLOAD_TYPE_MULTI_PART;
 
-    if (chunkadapter)
+    if (chunkadapter && !getBufferBool(gentl, parent->getHandle(), buffer,
+      GenTL::BUFFER_INFO_IS_INCOMPLETE))
     {
       chunkadapter->AttachBuffer(reinterpret_cast<std::uint8_t *>(
         getBufferValue<void *>(gentl, parent->getHandle(), buffer, GenTL::BUFFER_INFO_BASE)),
@@ -516,6 +520,32 @@ uint64_t Buffer::getPartSourceID(std::uint32_t part) const
   {
     return getBufferPartValue<uint64_t>(gentl, parent->getHandle(), buffer, part,
                                       GenTL::BUFFER_PART_INFO_SOURCE_ID);
+  }
+  else
+  {
+    return 0;
+  }
+}
+
+uint64_t Buffer::getPartRegionID(std::uint32_t part) const
+{
+  if (multipart)
+  {
+    return getBufferPartValue<uint64_t>(gentl, parent->getHandle(), buffer, part,
+                                      GenTL::BUFFER_PART_INFO_REGION_ID);
+  }
+  else
+  {
+    return 0;
+  }
+}
+
+uint64_t Buffer::getPartDataPurposeID(std::uint32_t part) const
+{
+  if (multipart)
+  {
+    return getBufferPartValue<uint64_t>(gentl, parent->getHandle(), buffer, part,
+                                      GenTL::BUFFER_PART_INFO_DATA_PURPOSE_ID);
   }
   else
   {
