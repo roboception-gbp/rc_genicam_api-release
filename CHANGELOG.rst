@@ -1,3 +1,36 @@
+2.5.12 (2021-10-23)
+-------------------
+
+- Imporved Windows build script for compiling with libpng
+- Fixed some issues when compiling under Windows
+
+2.5.11 (2021-10-05)
+-------------------
+
+- Fixed getting buffers with chunk data from Basler ace2 USB cameras
+
+2.5.10 (2021-10-01)
+-------------------
+
+- Make system, interface, device and stream ignore closing already closed objects
+
+2.5.9 (2021-10-01)
+------------------
+
+- Improved measuring of buffers per second in gc_stream
+- Do not show latency in gc_stream -t if PTP is turned off
+
+2.5.8 (2021-09-09)
+------------------
+
+- Added support for YUV422_8 and YCbCr422_8 pixel formats
+
+2.5.7 (2021-09-01)
+------------------
+
+- Added possibility to specify the internal number of buffers to allocate
+- gc_file tool: Exit with error if file cannot be loaded
+
 2.5.6 (2021-08-02)
 ------------------
 
