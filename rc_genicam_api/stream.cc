@@ -120,18 +120,18 @@ void Stream::close()
   if (n_open > 0)
   {
     n_open--;
-  }
 
-  if (n_open == 0)
-  {
-    stopStreaming();
-    gentl->DSClose(stream);
-    stream=0;
+    if (n_open == 0)
+    {
+      stopStreaming();
+      gentl->DSClose(stream);
+      stream=0;
 
-    buffer.setNodemap(0, "");
+      buffer.setNodemap(0, "");
 
-    nodemap=0;
-    cport=0;
+      nodemap=0;
+      cport=0;
+    }
   }
 }
 
@@ -151,7 +151,12 @@ void Stream::attachBuffers(bool enable)
   }
 }
 
-void Stream::startStreaming(int na)
+void Stream::startStreaming(int nacquire)
+{
+  startStreaming(nacquire, 4);
+}
+
+void Stream::startStreaming(int nacquire, int min_buffers)
 {
   std::lock_guard<std::recursive_mutex> lock(mtx);
 
@@ -200,7 +205,7 @@ void Stream::startStreaming(int na)
 
   bool err=false;
 
-  bn=std::max(static_cast<size_t>(4), getBufAnnounceMin());
+  bn=std::max(static_cast<size_t>(min_buffers), getBufAnnounceMin());
   for (size_t i=0; i<bn; i++)
   {
     GenTL::BUFFER_HANDLE pp=0;
@@ -230,9 +235,9 @@ void Stream::startStreaming(int na)
 
   uint64_t n=GENTL_INFINITE;
 
-  if (na > 0)
+  if (nacquire > 0)
   {
-    n=static_cast<uint64_t>(na);
+    n=static_cast<uint64_t>(nacquire);
   }
 
   if (!err && gentl->DSStartAcquisition(stream, GenTL::ACQ_START_FLAGS_DEFAULT, n) !=
