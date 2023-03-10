@@ -42,6 +42,12 @@
 
 #include <iostream>
 #include <fstream>
+#include <limits>
+
+#ifdef _WIN32
+#undef min
+#undef max
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -116,70 +122,21 @@ int main(int argc, char *argv[])
 
                 std::cout << "Input file length: " << data.size() << std::endl;
 
-                GenApi::FileProtocolAdapter rf;
-                rf.attach(nodemap->_Ptr);
-
-                if (rf.openFile(devfile.c_str(), std::ios::out))
-                {
-                  size_t n=rf.write(data.c_str(), 0, data.size(), devfile.c_str());
-                  rf.closeFile(devfile.c_str());
-
-                  std::cout << "Status: " << rcg::getString(nodemap, "FileOperationStatus") << std::endl;
-
-                  if (n != data.size())
-                  {
-                    std::cerr << "Error: Can only write " << n << " of " << data.size() << " bytes" << std::endl;
-                  }
-                }
-                else
-                {
-                  std::cerr << "ERROR: Failed to open remote file!" << std::endl;
-                }
+                rcg::saveFile(nodemap, devfile.c_str(), data, true);
               }
               else if (op == "-r" || op == "")
               {
-                // load file completely into memory
+                std::string data=rcg::loadFile(nodemap, devfile.c_str(), true);
 
-                GenApi::FileProtocolAdapter rf;
-                rf.attach(nodemap->_Ptr);
-
-                if (rf.openFile(devfile.c_str(), std::ios::in))
+                if (op == "-r")
                 {
-                  size_t n=rcg::getInteger(nodemap, "FileSize", 0, 0, true);
-                  std::cout << "File size: " << n << std::endl;
-                  std::vector<char> buffer(n);
-
-                  n=rf.read(buffer.data(), 0, buffer.size(), devfile.c_str());
-
-                  if (n == buffer.size())
-                  {
-                    if (op == "-r")
-                    {
-                      // store in file
-
-                      std::ofstream out(file);
-                      out.write(buffer.data(), buffer.size());
-                      out.close();
-                    }
-                    else
-                    {
-                      // print on stdout
-
-                      std::cout.write(buffer.data(), buffer.size());
-                    }
-                  }
-                  else
-                  {
-                    std::cerr << "Error: Can only read " << n << " of " << buffer.size() << " bytes" << std::endl;
-                  }
-
-                  rf.closeFile(devfile.c_str());
-
-                  std::cout << "Status: " << rcg::getString(nodemap, "FileOperationStatus") << std::endl;
+                  std::ofstream out(file);
+                  out << data;
+                  out.close();
                 }
                 else
                 {
-                  std::cerr << "Error: Cannot open remote file: " << devfile << std::endl;
+                  std::cout << data;
                 }
               }
               else
