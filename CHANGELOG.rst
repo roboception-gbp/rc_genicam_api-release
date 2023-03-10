@@ -1,3 +1,44 @@
+2.6.1 (2023-01-09)
+------------------
+
+- Fixed resetting of systems so that setSystemsPath() can be called again
+- Report reason if loading of producer fails
+- Fixed compiling under Windows
+- Fixed reading registers with size that is less than the requested size
+- Added convenience functions for loading and storing data on the camera via GenICam file interface
+
+2.6.0 (2022-11-09)
+------------------
+
+- Upgraded GenAPI to version 3.4
+- Changed gc_file to read and write in blocks of 512 bytes and made FileSize parameter optional
+
+2.5.17 (2022-10-13)
+-------------------
+
+- Added building for Jammy
+- Added possibility to specify GenICam parameters on the command line of gc_pointcloud tool
+- README: change grep for newer netstat versions
+
+2.5.16 (2022-05-29)
+-------------------
+
+- Added CI build pipelines for ARM64
+- net_perf_check.sh use first default interface
+- Show enum options even if WriteOnly
+
+2.5.14 (2022-02-02)
+-------------------
+
+- Install licenses of included binaries
+- Reporting interface id instead of display name in output of gc_info -s
+
+2.5.13 (2022-01-31)
+-------------------
+
+- Added parameter '-s' to gc_info for getting a short list of discovered devices
+- Fixed Windows build script
+
 2.5.12 (2021-10-23)
 -------------------
 
