@@ -299,7 +299,18 @@ std::string Device::getTLType()
 std::string Device::getDisplayName()
 {
   std::lock_guard<std::mutex> lock(mtx);
-  return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_DISPLAYNAME);
+
+  // return user defined name if available, otherwise the display name that
+  // the producer provides
+
+  std::string ret=cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_USER_DEFINED_NAME);
+
+  if (ret.size() == 0)
+  {
+    ret=cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_DISPLAYNAME);
+  }
+
+  return ret;
 }
 
 std::string Device::getAccessStatus()
@@ -365,7 +376,42 @@ std::string Device::getAccessStatus()
 std::string Device::getUserDefinedName()
 {
   std::lock_guard<std::mutex> lock(mtx);
-  return cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_USER_DEFINED_NAME);
+  std::string ret;
+
+  // try to get user defined name
+
+  GenTL::INFO_DATATYPE type=GenTL::INFO_DATATYPE_UNKNOWN;
+  char tmp[100]="";
+  size_t tmp_size=sizeof(tmp);
+  GenTL::GC_ERROR err=GenTL::GC_ERR_ERROR;
+
+  if (getHandle() != 0)
+  {
+    err=gentl->DevGetInfo(getHandle(), GenTL::DEVICE_INFO_USER_DEFINED_NAME, &type, tmp,
+      &tmp_size);
+  }
+  else if (getParent()->getHandle() != 0)
+  {
+    err=gentl->IFGetDeviceInfo(getParent()->getHandle(), getID().c_str(),
+      GenTL::DEVICE_INFO_USER_DEFINED_NAME, &type, tmp, &tmp_size);
+  }
+
+  if (err == GenTL::GC_ERR_SUCCESS && type == GenTL::INFO_DATATYPE_STRING)
+  {
+    for (size_t i=0; i<tmp_size && tmp[i] != '\0'; i++)
+    {
+      ret.push_back(tmp[i]);
+    }
+  }
+  else
+  {
+    // since user defined name is optional, fall back to display name in case
+    // of an error
+
+    ret=cDevGetInfo(this, gentl, GenTL::DEVICE_INFO_DISPLAYNAME);
+  }
+
+  return ret;
 }
 
 std::string Device::getSerialNumber()
@@ -427,6 +473,22 @@ std::shared_ptr<GenApi::CNodeMapRef> Device::getRemoteNodeMap(const char *xml)
   }
 
   return rnodemap;
+}
+
+std::shared_ptr<CPort> Device::getRemotePort()
+{
+  std::lock_guard<std::mutex> lock(mtx);
+
+  if (dev != 0 && !rnodemap)
+  {
+    if (gentl->DevGetPort(dev, &rp) == GenTL::GC_ERR_SUCCESS)
+    {
+      rport=std::shared_ptr<CPort>(new CPort(gentl, &rp));
+      rnodemap=allocNodeMap(gentl, rp, rport.get(), 0);
+    }
+  }
+
+  return rport;
 }
 
 void *Device::getHandle() const

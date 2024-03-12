@@ -63,7 +63,7 @@ class Image
       @param part   Part number from which the image should be created.
     */
 
-    Image(const Buffer *buffer, std::uint32_t part);
+    Image(const Buffer *buffer, uint32_t part);
 
     /**
       Pointer to pixel information of the image.
@@ -144,7 +144,7 @@ void convYCbCr422toRGB(uint8_t rgb[3], const uint8_t *row, int i);
   pixels) to RGB. Conversion of four pixels is a bit more efficient than
   conversions of individual pixels.
 
-  @param rgb Pointer to an array of size 3 for storing the result.
+  @param rgb Pointer to an array of size 3*4 for storing the result.
   @param row Image row.
   @param i   Index of first pixel in row that should be converted. The index
              must be a multiple of 4!
