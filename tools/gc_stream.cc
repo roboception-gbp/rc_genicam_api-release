@@ -41,6 +41,7 @@
 #include <rc_genicam_api/image.h>
 #include <rc_genicam_api/image_store.h>
 #include <rc_genicam_api/config.h>
+#include <rc_genicam_api/nodemap_out.h>
 
 #include <rc_genicam_api/pixel_formats.h>
 
@@ -68,12 +69,13 @@ void printHelp()
 {
   // show help
 
-  std::cout << "gc_stream -h | [-f <fmt>] [-t] [<interface-id>:]<device-id> [n=<n>] [<key>=<value>] ..." << std::endl;
+  std::cout << "gc_stream -h | [-c] [-f <fmt>] [-t] [<interface-id>:]<device-id> [n=<n>] [<key>=<value>] ..." << std::endl;
   std::cout << std::endl;
   std::cout << "Stores images from the specified device after applying the given optional GenICam parameters." << std::endl;
   std::cout << std::endl;
   std::cout << "Options:" << std::endl;
   std::cout << "-h         Prints help information and exits" << std::endl;
+  std::cout << "-c         Print ChunkDataControl category for all received buffers" << std::endl;
   std::cout << "-t         Testmode, which does not store images and provides extended statistics" << std::endl;
   std::cout << "-f pnm|png Format for storing images. Default is pnm" << std::endl;
   std::cout << std::endl;
@@ -96,7 +98,7 @@ std::string getDigitalIO(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap)
 {
   try
   {
-    std::int64_t line_status=rcg::getInteger(nodemap, "ChunkLineStatusAll", 0, 0, true);
+    int64_t line_status=rcg::getInteger(nodemap, "ChunkLineStatusAll", 0, 0, true);
 
     std::string out;
     std::string in;
@@ -335,6 +337,18 @@ void storeParameter(const std::shared_ptr<GenApi::CNodeMapRef> &nodemap,
       catch (const std::exception &)
       { }
 
+      for (int i=0; i<4; i++)
+      {
+        try
+        {
+          rcg::setEnum(nodemap, "ChunkLineSelector", ("Out"+std::to_string(i)).c_str(), true);
+          float v=static_cast<float>(rcg::getFloat(nodemap, "ChunkRcLineRatio", 0, 0, true));
+          out << "camera.out" << i << "_ratio=" << v << std::endl;
+        }
+        catch (const std::exception &)
+        { }
+      }
+
       if (scale > 0)
       {
         out << "disp.inv=" << inv << std::endl;
@@ -383,6 +397,7 @@ int main(int argc, char *argv[])
 
   try
   {
+    bool print_chunk_data=false;
     bool store=true;
     rcg::ImgFmt fmt=rcg::PNM;
     int i=1;
@@ -397,6 +412,11 @@ int main(int argc, char *argv[])
       {
         printHelp();
         return 0;
+      }
+      else if (param == "-c")
+      {
+        print_chunk_data=true;
+        i++;
       }
       else if (param == "-t")
       {
@@ -685,6 +705,20 @@ int main(int argc, char *argv[])
                     latency_ns+=
                       static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(current.time_since_epoch()).count())-
                       static_cast<double>(buffer->getTimestampNS());
+                  }
+
+                  // optinally print chunk data
+
+                  if (print_chunk_data)
+                  {
+                    std::cout << std::endl;
+
+                    if (!rcg::printNodemap(nodemap, "ChunkDataControl", 100, false))
+                    {
+                      std::cout << "Cannot find node 'ChunkDataControl'" << std::endl;
+                    }
+
+                    std::cout << std::endl;
                   }
                 }
                 else

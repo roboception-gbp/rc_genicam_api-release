@@ -46,6 +46,8 @@ set(src
   imagelist.cc
   image_store.cc
   pointcloud.cc
+  nodemap_out.cc
+  nodemap_edit.cc
   ${CMAKE_CURRENT_BINARY_DIR}/project_version.cc
   $<$<PLATFORM_ID:Linux>:gentl_wrapper_linux.cc>
   $<$<PLATFORM_ID:Windows>:gentl_wrapper_win32.cc>)
@@ -62,6 +64,8 @@ set(hh
   imagelist.h
   image_store.h
   pointcloud.h
+  nodemap_out.h
+  nodemap_edit.h
   pixel_formats.h
   ${CMAKE_CURRENT_BINARY_DIR}/project_version.h)
 
@@ -99,6 +103,15 @@ if (PNG_FOUND)
   include_directories(${PNG_INCLUDE_DIRS})
   add_definitions(-DINCLUDE_PNG)
   add_definitions(${PNG_DEFINITIONS})
+else ()
+  set(PNG_LIBRARIES)
+endif ()
+
+if (CURSES_FOUND)
+  include_directories(${CURSES_INCLUDE_DIRS})
+  add_definitions(-DINCLUDE_CURSES)
+else ()
+  set(CURSES_LIBRARIES)
 endif ()
 
 add_library(rc_genicam_api_private_properties INTERFACE)
@@ -129,6 +142,7 @@ target_link_libraries(rc_genicam_api_static
   PUBLIC
     ${PROJECT_NAMESPACE}::genicam
     ${PNG_LIBRARIES}
+    ${CURSES_LIBRARIES}
   PRIVATE
     ${PROJECT_NAMESPACE}::rc_genicam_api_private_properties)
 target_compile_options(rc_genicam_api_static
@@ -149,6 +163,7 @@ if (BUILD_SHARED_LIBS)
       ${PROJECT_NAMESPACE}::genicam
     PRIVATE
       ${PNG_LIBRARIES}
+      ${CURSES_LIBRARIES}
       ${PROJECT_NAMESPACE}::rc_genicam_api_private_properties)
   target_compile_options(rc_genicam_api
     PUBLIC
