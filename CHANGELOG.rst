@@ -1,3 +1,39 @@
+2.6.5 (2024-03-12)
+------------------
+
+- Added method to get remote port of device to directly read and write register
+- Added functions to read and write GenICam register parameters
+- Fixed write error message of gc_file tool
+- fix for gcc 13: use global stdint
+
+2.6.4 (2023-11-09)
+------------------
+
+- Fixed loading nodemap from file system
+- Return device display name, if device user defined name returns an error
+
+2.6.3 (2023-10-06)
+------------------
+
+- gc_config:
+  -Fixed calling data latch to properly show PTP status
+- gc_info:
+  - Added choice to either use local or remote nodemap of device
+  - Added extended output that includes printing the local nodemaps of system, interface and device as well
+
+2.6.2 (2023-05-17)
+------------------
+
+- If available, use user defined name of device as display name
+- Moving function for printing (part of) nodemap from tools to library
+- gc_info:
+  - Added possibility to edit nodemap in curses gui
+- gc_stream:
+  - Storing ChunkRcLineRatio in properties, if available
+  - Added option to print chunk data
+- Fixed build_win.bat: Include cmake files and allow renaming of base directory
+- Fixed allocating too much memory in Image class
+
 2.6.1 (2023-01-09)
 ------------------
 
