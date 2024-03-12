@@ -37,265 +37,10 @@
 #include <rc_genicam_api/interface.h>
 #include <rc_genicam_api/device.h>
 #include <rc_genicam_api/stream.h>
-#include <rc_genicam_api/config.h>
+#include <rc_genicam_api/nodemap_out.h>
+#include <rc_genicam_api/nodemap_edit.h>
 
 #include <iostream>
-
-namespace
-{
-
-/**
-  Returns the access mode of a node as string.
-
-  @param node Node.
-  @return     String with access mode.
-*/
-
-const char *getAccessMode(const GenApi::INode *node)
-{
-  switch (node->GetAccessMode())
-  {
-    case GenApi::NI:
-      return "(NI)";
-
-    case GenApi::NA:
-      return "(NA)";
-
-    case GenApi::WO:
-      return "(WO)";
-
-    case GenApi::RO:
-      return "(RO)";
-
-    case GenApi::RW:
-      return "(RW)";
-
-    case GenApi::_UndefinedAccesMode:
-      return "(undefined access mode)";
-
-    case GenApi::_CycleDetectAccesMode:
-      return "(cycle detection)";
-
-    default:
-      return "(unknown)";
-  }
-}
-
-/**
-  Takes an integer value and formats it according to the specification in the
-  node.
-
-  @param node  Node.
-  @param value Integer value.
-  @return      Formated value.
-*/
-
-std::string formatValue(GenApi::IInteger *node, int64_t value)
-{
-  std::ostringstream out;
-
-  switch (node->GetRepresentation())
-  {
-    case GenApi::HexNumber:
-      out << "0x" << std::hex << value;
-      break;
-
-    case GenApi::IPV4Address:
-       out << ((value>>24)&0xff) << '.' << ((value>>16)&0xff) << '.'
-           << ((value>>8)&0xff) << '.' << (value&0xff);
-       break;
-
-    case GenApi::MACAddress:
-       out << std::hex << ((value>>40)&0xff) << ':' << ((value>>32)&0xff) << ':'
-                       << ((value>>24)&0xff) << ':' << ((value>>16)&0xff) << ':'
-                       << ((value>>8)&0xff) << ':' << (value&0xff);
-       break;
-
-    default:
-      out << value;
-      break;
-  }
-
-  return out.str();
-}
-
-/**
-  Recursive printing of nodes to standard out.
-
-  @param prefix Prefix that will be prepended to every line.
-  @param node   Node to be printed.
-  @param depth  This value is reduced when calling printNode() recursively on
-                category nodes. If the value is <= 0, then no recursion is
-                done.
-*/
-
-void printNode(const std::string &prefix, GenApi::INode *node, int depth)
-{
-  if (node != 0 && node->GetAccessMode() != GenApi::NI)
-  {
-    switch (node->GetPrincipalInterfaceType())
-    {
-      case GenApi::intfIValue:
-        std::cout << prefix << "Value: " << node->GetName() << " " << getAccessMode(node)
-                  << std::endl;
-        break;
-
-      case GenApi::intfIBase:
-        std::cout << prefix << "Base: " << node->GetName() << " " << getAccessMode(node)
-                  << std::endl;
-        break;
-
-      case GenApi::intfIInteger:
-        {
-          std::cout << prefix << "Integer: " << node->GetName() << " "
-                    << getAccessMode(node) << " ";
-
-          GenApi::IInteger *p=dynamic_cast<GenApi::IInteger *>(node);
-
-          if (GenApi::IsReadable(p))
-          {
-            std::cout << "[" << formatValue(p, p->GetMin()) << ", "
-                      << formatValue(p, p->GetMax()) << "]: ";
-            std::cout << formatValue(p, p->GetValue()) << " " << p->GetUnit();
-          }
-
-          std::cout << std::endl;
-        }
-        break;
-
-      case GenApi::intfIBoolean:
-        {
-          std::cout << prefix << "Boolean: " << node->GetName() << " " << getAccessMode(node);
-
-          GenApi::IBoolean *p=dynamic_cast<GenApi::IBoolean *>(node);
-
-          if (GenApi::IsReadable(p))
-          {
-            std::cout << ": " << p->GetValue();
-          }
-
-          std::cout << std::endl;
-        }
-        break;
-
-      case GenApi::intfICommand:
-        std::cout << prefix << "Command: " << node->GetName() << " " << getAccessMode(node)
-                  << std::endl;
-        break;
-
-      case GenApi::intfIFloat:
-        {
-          std::cout << prefix << "Float: " << node->GetName() << " " << getAccessMode(node)
-                    << " ";
-
-          GenApi::IFloat *p=dynamic_cast<GenApi::IFloat *>(node);
-
-          if (GenApi::IsReadable(p))
-          {
-            std::cout << "[" << p->GetMin() << ", "
-                      << p->GetMax() << "]: "
-                      << p->GetValue() << " " << p->GetUnit();
-          }
-
-          std::cout << std::endl;
-        }
-        break;
-
-      case GenApi::intfIString:
-        {
-          std::cout << prefix << "String: " << node->GetName() << " " << getAccessMode(node)
-                    << ": ";
-
-          GenApi::IString *p=dynamic_cast<GenApi::IString *>(node);
-
-          if (GenApi::IsReadable(p))
-          {
-            std::cout << p->GetValue();
-          }
-
-          std::cout << std::endl;
-        }
-        break;
-
-      case GenApi::intfIRegister:
-        std::cout << prefix << "Register: " << node->GetName() << " " << getAccessMode(node)
-                  << std::endl;
-        break;
-
-      case GenApi::intfICategory:
-        {
-          std::cout << prefix << "Category: " << node->GetName() << " "
-                    << getAccessMode(node) << std::endl;
-
-          if (depth > 0)
-          {
-            GenApi::ICategory *root=dynamic_cast<GenApi::ICategory *>(node);
-
-            if (root != 0)
-            {
-              GenApi::FeatureList_t feature;
-              root->GetFeatures(feature);
-
-              for (size_t i=0; i<feature.size(); i++)
-              {
-                printNode(prefix+"  ", feature[i]->GetNode(), depth-1);
-              }
-            }
-          }
-        }
-        break;
-
-      case GenApi::intfIEnumeration:
-        {
-          std::cout << prefix << "Enumeration: " << node->GetName() << " " << getAccessMode(node)
-                    << ' ';
-
-          GenApi::IEnumeration *p=dynamic_cast<GenApi::IEnumeration *>(node);
-
-          if (p != nullptr)
-          {
-            std::cout << '[';
-
-            GenApi::StringList_t list;
-            p->GetSymbolics(list);
-
-            for (size_t i=0; i<list.size(); i++)
-            {
-              if (i > 0)
-              {
-                std::cout << ' ';
-              }
-
-              std::cout << list[i];
-            }
-
-            std::cout << "]: ";
-
-            if (GenApi::IsReadable(p->GetAccessMode()) && p->GetCurrentEntry() != 0)
-            {
-              std::cout << p->GetCurrentEntry()->GetSymbolic();
-            }
-          }
-
-          std::cout << std::endl;
-        }
-        break;
-
-      case GenApi::intfIEnumEntry:
-        std::cout << prefix << "EnumEntry: " << node->GetName() << " " << getAccessMode(node)
-                  << std::endl;
-        break;
-
-      case GenApi::intfIPort:
-        std::cout << prefix << "Port: " << node->GetName() << " " << getAccessMode(node)
-                  << std::endl;
-        break;
-
-    }
-  }
-}
-
-}
 
 int main(int argc, char *argv[])
 {
@@ -305,8 +50,10 @@ int main(int argc, char *argv[])
   {
     if (argc >= 2 && std::string(argv[1]) != "-h")
     {
-      if (std::string(argv[1]) == "-l")
+      if (std::string(argv[1]) == "-L" || std::string(argv[1]) == "-l")
       {
+        bool extended=(std::string(argv[1]) == "-L");
+
         // list all systems, interfaces and devices
 
         std::vector<std::shared_ptr<rcg::System> > system=rcg::System::getSystems();
@@ -329,6 +76,12 @@ int main(int argc, char *argv[])
 
           std::vector<std::shared_ptr<rcg::Interface> > interf=system[i]->getInterfaces();
 
+          if (extended)
+          {
+            rcg::printNodemap(system[i]->getNodeMap(), "Root");
+            std::cout << std::endl;
+          }
+
           for (size_t k=0; k<interf.size(); k++)
           {
             interf[k]->open();
@@ -339,6 +92,12 @@ int main(int argc, char *argv[])
             std::cout << std::endl;
 
             std::vector<std::shared_ptr<rcg::Device> > device=interf[k]->getDevices();
+
+            if (extended)
+            {
+              rcg::printNodemap(interf[k]->getNodeMap(), "Root");
+              std::cout << std::endl;
+            }
 
             for (size_t j=0; j<device.size(); j++)
             {
@@ -403,162 +162,207 @@ int main(int argc, char *argv[])
         // get parameters, if any
 
         const char *xml=0;
-        if (k+1 < argc && std::string(argv[k]) == "-o")
+        bool local_nodemap=false;
+        bool edit=false;
+
+        while (k+1 < argc && argv[k][0] == '-')
         {
-          k++;
-          xml=argv[k++];
-
-          if (std::string(xml) == ".")
+          if (std::string(argv[k]) == "-o")
           {
-            xml="";
-          }
-        }
+            k++;
+            xml=argv[k++];
 
-        if (k < argc)
-        {
-          // separate optional node name from device id
-
-          std::string devid=argv[k++];
-          std::string node="Root";
-          int depth=1000;
-
-          {
-            size_t j=devid.find('?');
-
-            if (j != std::string::npos)
+            if (std::string(xml) == ".")
             {
-              node=devid.substr(j+1);
-              devid=devid.substr(0, j);
-              depth=1;
-
-              if (node.size() == 0)
-              {
-                node="Root";
-              }
+              xml="";
             }
           }
-
-          // find specific device accross all systems and interfaces and show some
-          // information
-
-          std::shared_ptr<rcg::Device> dev=rcg::getDevice(devid.c_str());
-
-          if (dev)
+          else if (std::string(argv[k]) == "-d")
           {
-            // open device and optionally change some settings
-
-            if (k < argc)
-            {
-              dev->open(rcg::Device::CONTROL);
-            }
-            else
-            {
-              dev->open(rcg::Device::READONLY);
-            }
-
-            std::shared_ptr<GenApi::CNodeMapRef> nodemap=dev->getRemoteNodeMap(xml);
-
-            if (nodemap)
-            {
-              while (k < argc)
-              {
-                std::string p=argv[k++];
-
-                if (p.find('=') != std::string::npos)
-                {
-                  // split argument in key and value
-
-                  size_t j=p.find('=');
-                  std::string value=p.substr(j+1);
-                  std::string key=p.substr(0, j);
-
-                  // set key=value pair through GenICam
-
-                  rcg::setString(nodemap, key.c_str(), value.c_str(), true);
-                }
-                else
-                {
-                  // call the command
-                  rcg::callCommand(nodemap, p.c_str(), true);
-                }
-              }
-
-              if (depth > 1)
-              {
-                // report all features
-
-                std::cout << "Device:            " << dev->getID() << std::endl;
-                std::cout << "Vendor:            " << dev->getVendor() << std::endl;
-                std::cout << "Model:             " << dev->getModel() << std::endl;
-                std::cout << "TL type:           " << dev->getTLType() << std::endl;
-                std::cout << "Display name:      " << dev->getDisplayName() << std::endl;
-                std::cout << "User defined name: " << dev->getUserDefinedName() << std::endl;
-                std::cout << "Serial number:     " << dev->getSerialNumber() << std::endl;
-                std::cout << "Version:           " << dev->getVersion() << std::endl;
-                std::cout << "TS Frequency:      " << dev->getTimestampFrequency() << std::endl;
-                std::cout << std::endl;
-
-                std::vector<std::shared_ptr<rcg::Stream> > stream=dev->getStreams();
-
-                std::cout << "Available streams:" << std::endl;
-                for (size_t i=0; i<stream.size(); i++)
-                {
-                  std::cout << "  Stream ID: " << stream[i]->getID() << std::endl;
-                }
-
-                std::cout << std::endl;
-
-                std::cout << "Available features:" << std::endl;
-                printNode(std::string("  "), nodemap->_GetNode(node.c_str()), depth);
-              }
-              else
-              {
-                // report requested node only
-
-                GenApi::INode *p=nodemap->_GetNode(node.c_str());
-
-                if (p)
-                {
-                  printNode(std::string(), p, depth);
-                }
-                else
-                {
-                  std::cerr << "Unknown node: " << node << std::endl;
-                  ret=1;
-                }
-              }
-            }
-            else
-            {
-              std::cerr << "Nodemap not available!" << std::endl;
-            }
-
-            dev->close();
+            k++;
+            local_nodemap=true;
+          }
+          else if (std::string(argv[k]) == "-e")
+          {
+            k++;
+            edit=true;
           }
           else
           {
-            std::cerr << "Device '" << devid << "' not found!" << std::endl;
+            std::cerr << "Unknown parameter: " << argv[k] << std::endl;
             ret=1;
+            break;
           }
         }
-        else
+
+        if (ret == 0)
         {
-          std::cerr << "Device name not given!" << std::endl;
-          ret=1;
+          if (k < argc)
+          {
+            // separate optional node name from device id
+
+            std::string devid=argv[k++];
+            std::string node="Root";
+            int depth=1000;
+
+            {
+              size_t j=devid.find('?');
+
+              if (j != std::string::npos)
+              {
+                node=devid.substr(j+1);
+                devid=devid.substr(0, j);
+                depth=1;
+
+                if (node.size() == 0)
+                {
+                  node="Root";
+                }
+              }
+            }
+
+            // find specific device accross all systems and interfaces
+
+            std::shared_ptr<rcg::Device> dev=rcg::getDevice(devid.c_str());
+
+            if (dev)
+            {
+              // open device and optionally change some settings
+
+              if (k < argc || edit)
+              {
+                dev->open(rcg::Device::CONTROL);
+              }
+              else
+              {
+                dev->open(rcg::Device::READONLY);
+              }
+
+              std::shared_ptr<GenApi::CNodeMapRef> nodemap;
+              if (local_nodemap)
+              {
+                nodemap=dev->getNodeMap();
+              }
+              else
+              {
+                nodemap=dev->getRemoteNodeMap(xml);
+              }
+
+              if (nodemap)
+              {
+                while (k < argc)
+                {
+                  std::string p=argv[k++];
+
+                  if (p.find('=') != std::string::npos)
+                  {
+                    // split argument in key and value
+
+                    size_t j=p.find('=');
+                    std::string value=p.substr(j+1);
+                    std::string key=p.substr(0, j);
+
+                    // set key=value pair through GenICam
+
+                    rcg::setString(nodemap, key.c_str(), value.c_str(), true);
+                  }
+                  else
+                  {
+                    // call the command
+                    rcg::callCommand(nodemap, p.c_str(), true);
+                  }
+                }
+
+                if (edit)
+                {
+                  if (!rcg::editNodemap(nodemap, node.c_str()))
+                  {
+                    std::cerr << "Unknown node: " << node << std::endl;
+                    ret=1;
+                  }
+                }
+                else if (depth > 1)
+                {
+                  // report all features
+
+                  std::cout << "Device:            " << dev->getID() << std::endl;
+                  std::cout << "Vendor:            " << dev->getVendor() << std::endl;
+                  std::cout << "Model:             " << dev->getModel() << std::endl;
+                  std::cout << "TL type:           " << dev->getTLType() << std::endl;
+                  std::cout << "Display name:      " << dev->getDisplayName() << std::endl;
+                  std::cout << "User defined name: " << dev->getUserDefinedName() << std::endl;
+                  std::cout << "Serial number:     " << dev->getSerialNumber() << std::endl;
+                  std::cout << "Version:           " << dev->getVersion() << std::endl;
+                  std::cout << "TS Frequency:      " << dev->getTimestampFrequency() << std::endl;
+                  std::cout << std::endl;
+
+                  std::vector<std::shared_ptr<rcg::Stream> > stream=dev->getStreams();
+
+                  std::cout << "Available streams:" << std::endl;
+                  for (size_t i=0; i<stream.size(); i++)
+                  {
+                    std::cout << "  Stream ID: " << stream[i]->getID() << std::endl;
+                  }
+
+                  std::cout << std::endl;
+
+                  if (local_nodemap)
+                  {
+                    std::cout << "Local device nodemap:" << std::endl;
+                  }
+                  else
+                  {
+                    std::cout << "Remote device nodemap:" << std::endl;
+                  }
+
+                  rcg::printNodemap(nodemap, node.c_str(), depth, true);
+                }
+                else
+                {
+                  // report requested node only
+
+                  if (!rcg::printNodemap(nodemap, node.c_str(), depth, true))
+                  {
+                    std::cerr << "Unknown node: " << node << std::endl;
+                    ret=1;
+                  }
+                }
+              }
+              else
+              {
+                std::cerr << "Nodemap not available!" << std::endl;
+              }
+
+              dev->close();
+            }
+            else
+            {
+              std::cerr << "Device '" << devid << "' not found!" << std::endl;
+              ret=1;
+            }
+          }
+          else
+          {
+            std::cerr << "Device name not given!" << std::endl;
+            ret=1;
+          }
         }
       }
     }
     else
     {
-      std::cout << argv[0] << " -h | -l | -s | ([-o <xml-output-file>|.] [<interface-id>:]<device-id>[?<node>] [<key>=<value>] ...)" << std::endl;
+      std::cout << argv[0] << " -h | -L | -l | -s | ([-o <xml-output-file>|.] [-d] [-e] [<interface-id>:]<device-id>[?<node>] [<key>=<value>] ...)" << std::endl;
       std::cout << std::endl;
       std::cout << "Provides information about GenICam transport layers, interfaces and devices." << std::endl;
       std::cout << std::endl;
       std::cout << "Options: " << std::endl;
       std::cout << "-h   Prints help information and exits" << std::endl;
-      std::cout << "-l   List all all available devices on all interfaces" << std::endl;
-      std::cout << "-s   List all all available devices on all interfaces (short format)" << std::endl;
+      std::cout << "-L   List all available devices on all interfaces (extended format)" << std::endl;
+      std::cout << "-l   List all available devices on all interfaces" << std::endl;
+      std::cout << "-s   List all available devices on all interfaces (short format)" << std::endl;
       std::cout << "-o   Store XML description from specified device" << std::endl;
+      std::cout << "-d   Use local device nodemap, instead of remote nodemap" << std::endl;
+      std::cout << "-e   Open nodemap editor instead of printing nodemap" << std::endl;
       std::cout << std::endl;
       std::cout << "Parameters:" << std::endl;
       std::cout << "<interface-id> Optional GenICam ID of interface for connecting to the device" << std::endl;
